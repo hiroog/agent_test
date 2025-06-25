@@ -2,7 +2,6 @@ __pycache__
 *.bat
 *.7z
 *.zip
-input*.txt
-output*.txt
 /input/
 /output/
+config.json

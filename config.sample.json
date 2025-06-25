@@ -1,0 +1,26 @@
+{
+    "base_url": "http://localhost:11434",
+    "preset": {
+        "default": {
+            "model": "qwen3:8b",
+            "tools": [
+            ]
+        },
+        "test01": {
+            "model": "qwen3:8b",
+            "num_ctx": 2048,
+            "base_prompt": "Toolを使用して23189234+147234を計算してください",
+            "tools": [
+	    	"calc_add"
+            ]
+        },
+        "test02": {
+            "model": "qwen3:8b",
+            "num_ctx": 2048,
+            "base_prompt": "今日の東京と札幌の天気は",
+            "tools": [
+	    	"get_weather"
+            ]
+        }
+    }
+}

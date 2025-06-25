@@ -14,18 +14,29 @@ class OptionBase:
     def __init__( self ):
         pass
 
-    def set_str( self, ai, argv, name ):
+    def get_arg( self, ai, argv ):
         acount= len(argv)
         if ai+1 < acount:
             ai+= 1
-            setattr( self, name, argv[ai] )
+            return  ai,argv[ai]
+        return  ai,None
+
+    def set_str( self, ai, argv, name ):
+        ai,arg= self.get_arg( ai, argv )
+        if arg:
+            setattr( self, name, arg )
         return  ai
 
     def set_int( self, ai, argv, name ):
-        acount= len(argv)
-        if ai+1 < acount:
-            ai+= 1
-            setattr( self, name, int(argv[ai]) )
+        ai,arg= self.get_arg( ai, argv )
+        if arg:
+            setattr( self, name, int(arg) )
+        return  ai
+
+    def set_float( self, ai, argv, name ):
+        ai,arg= self.get_arg( ai, argv )
+        if arg:
+            setattr( self, name, float(arg) )
         return  ai
 
     def apply_params( self, params ):
@@ -41,6 +52,7 @@ class OllamaOptions(OptionBase):
         self.timeout= 600
         self.model_name= 'qwen3:8b'
         self.num_ctx= 8192
+        self.temperature= -1.0
         self.remove_think= True
         self.debug_echo= False
         self.tools= None
@@ -189,10 +201,14 @@ class OllamaAPI:
                 'num_ctx': self.options.num_ctx,
             },
         }
+        if self.options.temperature >= 0.0:
+            params['options']['temperature']= self.options.temperature
         if tools:
             params['tools']= tools.get_tools()
         api_url= self.options.base_url + '/api/chat'
         data= json.dumps( params )
+        if self.options.debug_echo:
+            print( 'options=', params['options'], flush=True )
         try:
             result= requests.post( api_url, headers={ 'Content-Type': 'application/json' }, data=data, timeout=self.options.timeout )
         except Exception as e:
@@ -291,6 +307,7 @@ def usage():
     print( '  --input <text_file.txt>' )
     print( '  --output <save_file.txt>' )
     print( '  --num_ctx <num_ctx>          default 8192' )
+    print( '  --temperature <temperature>' )
     print( '  --debug' )
     sys.exit( 0 )
 
@@ -317,6 +334,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'output' )
             elif arg == '--num_ctx':
                 ai= options.set_int( ai, argv, 'num_ctx' )
+            elif arg == '--temperature':
+                ai= options.set_float( ai, argv, 'temperature' )
             elif arg == '--debug':
                 options.debug_echo= True
             else:
