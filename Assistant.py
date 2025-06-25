@@ -35,7 +35,7 @@ import Functions
 #    "header": "～",    option
 #    "model": "",       option
 #    "env": {           option
-#       "ename": "evalue"
+#       "envname": "envvalue"
 #    }
 # }
 
@@ -71,7 +71,8 @@ class Assistant:
         return  None, None
 
     def set_env( self, env_map ):
-        pass
+        for name in env_map:
+            os.environ[name]= env_map[name]
 
     #--------------------------------------------------------------------------
 
@@ -86,6 +87,8 @@ class Assistant:
             system+= preset_system + '\n' + system
         if 'model' in input_obj:
             self.options.model_name= input_obj['model']
+        if 'env' in input_obj:
+            self.set_env( input_obj['env'] )
         header_text= input_obj.get( 'header', '' )
         response,status_code= self.ollama_api.generate( prompt, system )
         if status_code != 200:
@@ -150,7 +153,8 @@ def usage():
     print( '  --post <channel>' )
     print( '  --print' )
     print( '  --debug' )
-    sys.exit( 0 )
+    print( 'ex. python Assistant.py --input_json prompt.json --print' )
+    sys.exit( 1 )
 
 
 def main( argv ):
