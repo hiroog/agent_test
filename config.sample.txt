@@ -1,0 +1,41 @@
+;; vim:ts=4 sw=4 et:
+
+S base_url  http://localhost:11434
+
+
+======== default
+
+A tools
+
+
+
+======== test01
+
+S model     qwen3:8b
+I num_ctx   2048
+A tools	    calc_add
+
+
+
+======== test02
+
+S model     qwen3:8b
+I num_ctx   2048
+A tools	    get_weather
+
+
+
+======== assistant1
+
+S model     qwen3:14b
+I num_ctx   16384
+A tools	    read_source_code
+
+====T header
+**AI Assistant**
+====T base_prompt
+
+以下のエラーを日本語で解説してください。
+C++のエラーの場合はToolを使ってソースコードやヘッダファイルを参照しながら解説してください。
+
+

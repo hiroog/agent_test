@@ -9,41 +9,66 @@ sys.path.append( os.path.dirname(__file__) )
 import OllamaAPI4
 import SlackAPI
 import Functions
+import TextLoader
 
 #------------------------------------------------------------------------------
 
 # config.json
 # {
-#    "preset": {
-#        "name1": {
-#           "model": "model-name",          option
-#           "system_prompt": "prompt",      option
-#           "base_prompt": "prompt",        option
-#           "num_ctx": 4096,                option
-#           "temperature": 0.7,             option
-#           "tools": [
-#              "calculator",
-#           ]
-#        }
+#    "base_url": "http://localhost:11434",
+#    "preset-name1": {
+#       "model": "model-name",          option
+#       "system_prompt": "prompt",      option
+#       "base_prompt": "prompt",        option
+#       "num_ctx": 4096,                option
+#       "temperature": 0.7,             option
+#       "tools": [
+#          "calculator",
+#       ]
 #    }
 # }
 
-# input_json.json
+# config.txt
+# S base_url    http://localhost:11434
+# ======== preset-name1
+# S model       model-name              option
+# I num_ctx     4096                    option
+# F temperature 0.7                     option
+# A tools       calculator              option
+# ====T system_prompt                   option
+# prompt
+# ====T base_prompt                     option
+# prompt
+
+# input_file.json
 # {
 #    "prompt": "～",
 #    "system": "～",    option
 #    "header": "～",    option
 #    "model": "",       option
-#    "env": {           option
-#       "envname": "envvalue"
-#    }
+#    "preset": "",      option
+#    "env": [           option
+#       "envname=envvalue"
+#    ]
 # }
+
+# input_file.txt
+# S preset ～               option
+# S model ～                option
+# A env envname=envvalue ～ option
+# ====T prompt
+# ～
+# ====T system          option
+# ～
+# ====T header          option
+# ～
+
 
 #------------------------------------------------------------------------------
 
 class Assistant:
     def __init__( self, options ):
-        self.config= self.load_json( options.config_file )
+        self.config= self.load_file( options.config_file )
         options.tools= Functions.get_tools()
         options.tools.debug_echo= options.debug_echo
         self.options= options
@@ -57,28 +82,34 @@ class Assistant:
                 return  json.loads( fi.read() )
         return  None
 
+    def load_file( self, file_name ):
+        if file_name.lower().endswith( '.json' ):
+            return  self.load_json( file_name )
+        loader= TextLoader.TextLoader()
+        return  loader.load( file_name )
+
     def load_preset( self, preset_name ):
         if self.config:
-            preset_map= self.config['preset']
             self.options.base_url= self.config.get( 'base_url', self.options.base_url )
-            if preset_name in preset_map:
-                preset= preset_map[preset_name]
+            if preset_name in self.config:
+                preset= self.config[preset_name]
                 self.options.model_name= preset.get( 'model', self.options.model_name )
                 self.options.num_ctx= preset.get( 'num_ctx', self.options.num_ctx )
                 self.options.temperature= preset.get( 'temperature', self.options.temperature )
                 self.options.tools.select_tools( preset['tools'] )
-                return  preset.get( 'base_prompt', None ),preset.get( 'system_prompt', None )
-        return  None, None
+                return  preset.get( 'base_prompt', None ),preset.get( 'system_prompt', None ),preset.get( 'header', '' )
+        return  None,None,''
 
-    def set_env( self, env_map ):
-        for name in env_map:
-            os.environ[name]= env_map[name]
+    def set_env( self, env_list ):
+        for name in env_list:
+            params= name.split( '=' )
+            os.environ[params[0]]= params[1]
 
     #--------------------------------------------------------------------------
 
-    def generate_from_file( self, input_file ):
-        preset_prompt,preset_system= self.load_preset( self.options.preset )
-        input_obj= self.load_json( input_file )
+    def generate_from_file( self, input_obj ):
+        preset= input_obj.get( 'preset', self.options.preset )
+        preset_prompt,preset_system,preset_header= self.load_preset( preset )
         prompt= input_obj['prompt']
         if preset_prompt:
             prompt= preset_prompt + '\n' + prompt
@@ -89,7 +120,7 @@ class Assistant:
             self.options.model_name= input_obj['model']
         if 'env' in input_obj:
             self.set_env( input_obj['env'] )
-        header_text= input_obj.get( 'header', '' )
+        header_text= input_obj.get( 'header', preset_header )
         response,status_code= self.ollama_api.generate( prompt, system )
         if status_code != 200:
             print( 'Generate Error: %d' % status_code, flush=True )
@@ -107,7 +138,13 @@ class Assistant:
             if token is None:
                 print( 'SLACK_API_TOKEN must be set in the environment' ) 
                 return
-        response,status_code,prompt= self.generate_from_file( self.options.input_json )
+        input_obj= None
+        if self.options.input_file:
+            input_obj= self.load_file( self.options.input_file )
+        else:
+            print( 'Input file not found:', self.options.input_file )
+            return
+        response,status_code,prompt= self.generate_from_file( input_obj )
         if status_code != 200:
             return
         if self.options.channel:
@@ -139,27 +176,27 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.00' )
+    print( 'Assistant v1.10' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )
     print( '  --model <model_name>' )
     print( '  --host <ollama_host>        (default: http://localhost:11434)' )
     print( '  --provider <provider>' )
-    print( '  --input_json <input.json>' )
+    print( '  --input <input.json|.txt>' )
     print( '  --num_ctx <num>' )
-    print( '  --config <config.json>' )
+    print( '  --config <config.txt>' )
     print( '  --save <output.txt>' )
     print( '  --post <channel>' )
     print( '  --print' )
     print( '  --debug' )
-    print( 'ex. python Assistant.py --input_json prompt.json --print' )
+    print( 'ex. python Assistant.py --input prompt.json --print' )
     sys.exit( 1 )
 
 
 def main( argv ):
     acount= len(argv)
-    options= OllamaAPI4.OllamaOptions( print=False, input_json=None, output_text=None, channel=None, config_file='config.json', preset='default' )
+    options= OllamaAPI4.OllamaOptions( print=False, input_file=None, output_text=None, channel=None, config_file='config.txt', preset='default' )
     text_list= []
     run_flag= False
     ai= 1
@@ -174,8 +211,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'provider' )
             elif arg == '--preset':
                 ai= options.set_str( ai, argv, 'preset' )
-            elif arg == '--input_json':
-                ai= options.set_str( ai, argv, 'input_json' )
+            elif arg == '--input':
+                ai= options.set_str( ai, argv, 'input_file' )
             elif arg == '--save':
                 ai= options.set_str( ai, argv, 'output_text' )
                 run_flag= True
@@ -198,7 +235,7 @@ def main( argv ):
             usage()
         ai+= 1
 
-    if options.input_json and run_flag:
+    if run_flag:
         api= Assistant( options )
         api.f_post_or_save()
     else:

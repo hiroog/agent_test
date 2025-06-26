@@ -1,0 +1,4 @@
+S preset test02
+====T prompt
+今日の東京と札幌の天気は
+
