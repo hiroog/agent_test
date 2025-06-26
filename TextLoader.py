@@ -78,7 +78,6 @@ class TextLoader:
     def load( self, file_name ):
         if not os.path.exists( file_name ):
             return  None
-        print( 'load:', file_name )
         with open( file_name, 'r', encoding='utf-8' ) as fi:
             lines= fi.readlines()
         map_obj= {}
@@ -101,6 +100,39 @@ class TextLoader:
             index+= 1
         return  map_obj
 
+    def save_dict( self, fo, obj ):
+        for key in obj:
+            val= obj[key]
+            if type(val) is str:
+                if '\n' not in val:
+                    fo.write( 'S %s %s\n' % (key, val) )
+            elif type(val) is int:
+                fo.write( 'I %s %d\n' % (key, val) )
+            elif type(val) is float:
+                fo.write( 'F %s %f\n' % (key, val) )
+            elif type(val) is list:
+                fo.write( 'A %s ' % key )
+                for v in val:
+                    fo.write( ' ' + v )
+                fo.write( '\n' )
+        for key in obj:
+            val= obj[key]
+            if type(val) is str:
+                if '\n' in val:
+                    fo.write( '====T %s\n' % key )
+                    fo.write( val )
+                    if len(val) >= 1 and val[-1] != '\n':
+                        fo.write( '\n' )
+        for key in obj:
+            val= obj[key]
+            if type(val) is dict:
+                fo.write( '======== %s\n' % key )
+                self.save_dict( fo, val )
+
+    def save( self, file_name, obj ):
+        with open( file_name, 'w', encoding='utf-8' ) as fo:
+            self.save_dict( fo, obj )
+
 #------------------------------------------------------------------------------
 
 def main( argv ):
@@ -114,9 +146,19 @@ def main( argv ):
         else:
             file_name= arg
         ai+= 1
-    loader= TextLoader()
-    obj= loader.load( file_name )
-    print( obj )
+    if file_name:
+        import json
+        loader= TextLoader()
+        if file_name.lower().endswith( '.json' ):
+            with open( file_name, 'r', encoding='utf-8' ) as fi:
+                obj= json.loads( fi.read() )
+        else:
+            obj= loader.load( file_name )
+        print( obj )
+        if obj:
+            loader.save( file_name + '.output.txt', obj )
+            with open( file_name + '.output.json', 'w', encoding='utf-8' ) as fo:
+                fo.write( json.dumps( obj, ensure_ascii=False, indent=4 ) )
     return  0
 
 if __name__=='__main__':

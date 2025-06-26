@@ -39,6 +39,8 @@ import TextLoader
 # prompt
 # ====T base_prompt                     option
 # prompt
+# ======== preset-name2
+# A chain       preset-name1 preset-name2 ..
 
 # input_file.json
 # {
@@ -77,12 +79,12 @@ class Assistant:
     #--------------------------------------------------------------------------
     def load_json( self, file_name ):
         if os.path.exists( file_name ):
-            print( 'load:', file_name )
             with open( file_name, 'r', encoding='utf-8' ) as fi:
                 return  json.loads( fi.read() )
         return  None
 
     def load_file( self, file_name ):
+        print( 'load:', file_name, flush=True )
         if file_name.lower().endswith( '.json' ):
             return  self.load_json( file_name )
         loader= TextLoader.TextLoader()
@@ -107,9 +109,10 @@ class Assistant:
 
     #--------------------------------------------------------------------------
 
-    def generate_from_file( self, input_obj ):
-        preset= input_obj.get( 'preset', self.options.preset )
-        preset_prompt,preset_system,preset_header= self.load_preset( preset )
+    def generate_text( self, input_obj, preset_name= None ):
+        if preset_name is None:
+            preset_name= input_obj.get( 'preset', self.options.preset )
+        preset_prompt,preset_system,preset_header= self.load_preset( preset_name )
         prompt= input_obj['prompt']
         if preset_prompt:
             prompt= preset_prompt + '\n' + prompt
@@ -130,6 +133,24 @@ class Assistant:
         response= header_text + response
         return  response,status_code,prompt
 
+    def generate_chain( self, input_obj ):
+        preset_name= input_obj.get( 'preset', self.options.preset )
+        if self.config:
+            if preset_name in self.config:
+                preset= self.config[preset_name]
+                if 'chain' in preset:
+                    first_prompt= None
+                    for chain_name in preset['chain']:
+                        print( '>>>>> %s' % chain_name, flush=True )
+                        response,status_code,prompt= self.generate_text( input_obj, chain_name )
+                        if first_prompt is None:
+                            first_prompt= prompt
+                        if status_code != 200:
+                            break
+                        input_obj['prompt']= response
+                    return  response,status_code,first_prompt
+        return  self.generate_text( input_obj, preset_name )
+
     #--------------------------------------------------------------------------
 
     def f_post_or_save( self ):
@@ -144,7 +165,7 @@ class Assistant:
         else:
             print( 'Input file not found:', self.options.input_file )
             return
-        response,status_code,prompt= self.generate_from_file( input_obj )
+        response,status_code,prompt= self.generate_chain( input_obj )
         if status_code != 200:
             return
         if self.options.channel:
@@ -176,7 +197,7 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.10' )
+    print( 'Assistant v1.20' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )
