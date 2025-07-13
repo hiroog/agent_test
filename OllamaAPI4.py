@@ -188,10 +188,30 @@ class OllamaAPI:
 
     #--------------------------------------------------------------------------
 
+    def dump_object( self, ch, obj, ignore_set ):
+        for key in obj:
+            if key not in ignore_set:
+                print( ' %s %s=%s' % (ch,key,obj[key]) )
+
+    def dump_message( self, message ):
+        role= message.get( 'role', '<UNKNOWN>' )
+        content= message.get( 'content', '<None>' )
+        print( '----- Role:[%s]' % role )
+        print( content )
+        ignore_set= set( ['role','content'] )
+        self.dump_object( '*', message, ignore_set )
+
+    def dump_response( self, response ):
+        if 'message' in response:
+            self.dump_message( response['message'] )
+        ignore_set= set( ['message'] )
+        self.dump_object( '+', response, ignore_set )
+
     def chat_ollama_1( self, message_list, tools ):
         if self.options.debug_echo:
-            print( '=============' )
-            print( message_list )
+            print( '============= SendMessages' )
+            for message in message_list:
+                self.dump_message( message )
             print( '=============', flush=True )
         params= {
             'model': self.options.model_name,
@@ -216,7 +236,9 @@ class OllamaAPI:
         if result.status_code == 200:
             data= result.json()
             if self.options.debug_echo:
-                print( data )
+                print( '============= Response' )
+                self.dump_response( data )
+                print( '=============' )
             message= data['message']
             return  message,result.status_code
         else:
@@ -246,10 +268,11 @@ class OllamaAPI:
                 return  '',status_code
             role= message['role']
             if role == 'assistant':
+                if 'content' in message:
+                    assistant_content= message['content']
+                    message_list.append( message )
                 tool_calls= message.get( 'tool_calls', None )
                 if tool_calls:
-                    if self.options.debug_echo:
-                        print( tool_calls, flush=True )
                     for tool_call in tool_calls:
                         function= tool_call['function']
                         func_name= function['name']
@@ -261,7 +284,7 @@ class OllamaAPI:
                             print( '**TOOL**', data, flush=True )
                         message= {
                                 'role': 'tool',
-                                'name': func_name,
+                                'tool_name': func_name,
                                 'content': data,
                             }
                         message_list.append( message )
@@ -297,8 +320,8 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.00' )
-    print( 'usage: OllamaAPI3 [<options>] [<message..>]' )
+    print( 'OllamaAPI v4.10' )
+    print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )
     print( '  --model <model_name>' )
