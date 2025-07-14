@@ -122,7 +122,7 @@ def read_source_code( file_name: str ) -> str:
     if os.path.exists( full_name ):
         with open( full_name, 'r', encoding='utf-8' ) as fi:
             code= fi.read()
-        return  code
+        return  ('** File: %s **\n\n' % base_name) + code
     print( 'not found:', full_name, flush=True )
     return  'File "%s" not found' % file_name
 

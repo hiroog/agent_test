@@ -197,7 +197,7 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.20' )
+    print( 'Assistant v1.21' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )
@@ -209,6 +209,7 @@ def usage():
     print( '  --config <config.txt>' )
     print( '  --save <output.txt>' )
     print( '  --post <channel>' )
+    print( '  --timeout <sec>             (default: 600)' )
     print( '  --print' )
     print( '  --debug' )
     print( 'ex. python Assistant.py --input prompt.json --print' )
@@ -244,6 +245,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'config_file' )
             elif arg == '--num_ctx':
                 ai= options.set_int( ai, argv, 'num_ctx' )
+            elif arg == '--timeout':
+                ai= options.set_int( ai, argv, 'timeout' )
             elif arg == '--print':
                 options.print= True
                 run_flag= True
