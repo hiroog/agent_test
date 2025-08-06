@@ -207,7 +207,31 @@ class OllamaAPI:
         ignore_set= set( ['message'] )
         self.dump_object( '+', response, ignore_set )
 
-    def chat_ollama_1( self, message_list, tools ):
+    def decode_streaming( self, result ):
+        content= ''
+        thinking= ''
+        tools= []
+        for line in result.text.split( '\n' ):
+            data= json.loads( line )
+            message= data['message']
+            role= message['role']
+            content+= message['content']
+            if 'thinking' in message:
+                thinking+= message['thinking']
+            if 'tool_calls' in message:
+                tools.extend( message['tool_calls'] )
+            if data['done']:
+                break
+        message['content']= content
+        if thinking != '':
+            message['thinking']= thinking
+        if message['role'] == '':
+            message['role']= 'assistant'
+        if tools != []:
+            message['tool_calls']= tools
+        return  data
+
+    def chat_ollama_1( self, message_list, tools, streaming= False ):
         if self.options.debug_echo:
             print( '============= SendMessages' )
             for message in message_list:
@@ -216,7 +240,7 @@ class OllamaAPI:
         params= {
             'model': self.options.model_name,
             'messages': message_list,
-            'stream': False,
+            'stream': streaming,
             'options': {
                 'num_ctx': self.options.num_ctx,
             },
@@ -229,12 +253,19 @@ class OllamaAPI:
         data= json.dumps( params )
         if self.options.debug_echo:
             print( 'options=', params['options'], flush=True )
+        headers= {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer %s' % os.environ.get('OLLAMA_API_KEY', os.environ.get( 'OPENAI_API_KEY', None) ),
+        }
         try:
-            result= requests.post( api_url, headers={ 'Content-Type': 'application/json' }, data=data, timeout=self.options.timeout )
+            result= requests.post( api_url, headers=headers, data=data, timeout=self.options.timeout )
         except Exception as e:
             return  None,408
         if result.status_code == 200:
-            data= result.json()
+            if streaming:
+                data= self.decode_streaming( result )
+            else:
+                data= result.json()
             if self.options.debug_echo:
                 print( '============= Response' )
                 self.dump_response( data )
@@ -320,7 +351,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.10' )
+    print( 'OllamaAPI v4.20' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )
@@ -337,7 +368,7 @@ def usage():
 
 def main( argv ):
     acount= len(argv)
-    options= OllamaOptions( image_file= None )
+    options= OllamaOptions( image_file= None, input=None, output=None )
     text_list= []
     ai= 1
     while ai < acount:
