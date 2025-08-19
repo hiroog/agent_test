@@ -78,32 +78,35 @@ class OllamaAPI:
 
     #--------------------------------------------------------------------------
 
-    def chat1_oai( self, text, system= None, image_data= None ):
+    def chat_oai_1( self, message_list, tools ):
+        if self.options.debug_echo:
+            print( '============= SendMessages' )
+            for message in message_list:
+                self.dump_message( message )
+            print( '=============', flush=True )
         params= {
             'model': self.options.model_name,
-            'messages': [
-                {
-                    "role": "user",
-                    "content": text,
-                }
-            ],
+            'messages': message_list,
+            'num_ctx': self.options.num_ctx,
         }
-        if image_data:
-            b64_image= image_to_base64( image_data )
-            params['messages'][0]['content']= {
-                {
-                    "type": "input_text",
-                    "text": text,
-                },
-                {
-                    "type": "input_image",
-                    "image": f"data:mage/jpeg:base64,{b64_image}",
-                }
-            }
-        if system:
-            params['messages'].insert( 0, { "role": self.options.system_role, "content": system } )
+        if tools:
+            params['tools']= tools.get_tools()
         api_url= self.options.base_url + '/v1/chat/completions'
         data= json.dumps( params )
+        if self.options.temperature >= 0.0:
+            params['temperature']= self.options.temperature
+        if self.options.top_k > 0:
+            params['top_k']= self.options.top_k
+        if self.options.top_p > 0.0:
+            params['top_p']= self.options.top_p
+        if self.options.min_p >= 0.0:
+            params['min_p']= self.options.min_p
+        if self.options.debug_echo:
+            dump_params= {}
+            for key in params:
+                if key != 'messages':
+                    dump_params[key]= params[key]
+            print( 'options=', dump_params, flush=True )
         headers= {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer %s' % os.environ.get('OPENAI_API_KEY', 'lm-studio'),
@@ -114,13 +117,77 @@ class OllamaAPI:
             return  '',408
         if result.status_code == 200:
             data= result.json()
-            response= data['choices'][0]['message']['content']
-            if self.options.remove_think:
-                response= self.remove_think_tag( response )
-            return  response,result.status_code
+            if self.options.debug_echo:
+                print( '============= Response' )
+                self.dump_response( data )
+                print( '=============' )
+            message= data['choices'][0]['message']
+            return  message,result.status_code
         else:
             print( 'Error: %d' % result.status_code, flush=True )
-        return  '',result.status_code
+        return  None,result.status_code
+
+    def chat_oai( self, text, system= None, image_data= None ):
+        tools= self.options.tools
+        message_list= []
+        message= {
+                    'role': 'user',
+                    'content': text,
+                }
+        if image_data:
+            b64_image= image_to_base64( image_data )
+            message['content']= {
+                {
+                    'type': 'input_text',
+                    'text': text,
+                },
+                {
+                    'type': 'input_image',
+                    'image': f'data:mage/jpeg:base64,{b64_image}',
+                }
+            }
+        if system:
+            message_list.append( {
+                    'role': self.options.system_role,
+                    'content': system,
+                } )
+        message_list.append( message )
+        response= ''
+        status_code= 408
+        while True:
+            message,status_code= self.chat_oai_1( message_list, tools )
+            if status_code != 200:
+                return  '',status_code
+            role= message['role']
+            if role == 'assistant':
+                if 'content' in message:
+                    assistant_content= message['content']
+                    message_list.append( message )
+                tool_calls= message.get( 'tool_calls', None )
+                if tool_calls:
+                    for tool_call in tool_calls:
+                        tool_call_id= tool_call['id']
+                        function= tool_call['function']
+                        func_name= function['name']
+                        arguments= json.loads(function['arguments'])
+                        data= ''
+                        if tools:
+                            data= tools.call_func( func_name, arguments )
+                        if self.options.debug_echo:
+                            print( '**TOOL**', data, flush=True )
+                        message= {
+                                'role': 'tool',
+                                'name': func_name,
+                                'tool_call_id': tool_call_id,
+                                'content': data,
+                            }
+                        message_list.append( message )
+                    continue
+                response= message.get( 'content', '' )
+                if self.options.remove_think:
+                    response= self.remove_think_tag( response )
+            break
+        return  response,status_code
 
     #--------------------------------------------------------------------------
 
@@ -338,14 +405,12 @@ class OllamaAPI:
     #--------------------------------------------------------------------------
 
     def generate( self, text, system= None, image_data= None ):
-        if self.options.provider == 'ollama':
-            return  self.generate_ollama( text, system, image_data )
-        elif self.options.provider == 'ollama2':
+        if self.options.provider == 'ollama2':
             return  self.generate_ollama_chat( text, system, image_data )
         elif self.options.provider == 'lmstudio':
-            return  self.chat1_oai( text, system, image_data )
-        elif self.options.provider == 'openai':
-            return  self.generate_oai( text, system, image_data )
+            return  self.chat_oai( text, system, image_data )
+        #elif self.options.provider == 'openai':
+        #    return  self.generate_oai( text, system, image_data )
         return  '',400
 
     #--------------------------------------------------------------------------
@@ -360,7 +425,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.21' )
+    print( 'OllamaAPI v4.22' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )

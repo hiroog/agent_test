@@ -94,6 +94,7 @@ class Assistant:
     def load_preset( self, preset_name ):
         if self.config:
             self.options.base_url= self.config.get( 'base_url', self.options.base_url )
+            self.options.provider= self.config.get( 'provider', self.options.provider )
             self.options.model_name= self.config.get( 'model_name', self.options.model_name )
             self.options.num_ctx= self.config.get( 'num_ctx', self.options.num_ctx )
             self.options.temperature= self.config.get( 'temperature', self.options.temperature )
@@ -103,6 +104,7 @@ class Assistant:
             if preset_name in self.config:
                 preset= self.config[preset_name]
                 self.options.base_url= preset.get( 'base_url', self.options.base_url )
+                self.options.provider= preset.get( 'provider', self.options.provider )
                 self.options.model_name= preset.get( 'model', self.options.model_name )
                 self.options.num_ctx= preset.get( 'num_ctx', self.options.num_ctx )
                 self.options.temperature= preset.get( 'temperature', self.options.temperature )
