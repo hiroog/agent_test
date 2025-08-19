@@ -108,15 +108,20 @@ def read_source_code( file_name: str ) -> str:
     By simply specifying the file name, you can search the Project and Engine folders and read the file content.
     """
     base_name= os.path.basename( file_name )
-    project_path= os.environ.get( 'MCP_PROJECT_ROOT', '' )
-    engine_path= os.environ.get( 'MCP_ENGINE_ROOT', '' )
     search_list= []
-    if project_path != '':
-        search_list.append( os.path.join( project_path, 'Source' ) )
-        search_list.append( os.path.join( project_path, 'Plugins' ) )
-    if engine_path != '':
-        search_list.append( os.path.join( engine_path, 'Engine/Source' ) )
-        search_list.append( os.path.join( engine_path, 'Engine/Plugins' ) )
+    source_root= os.environ.get( 'MCP_SOURCE_ROOT', '' )
+    if source_root != '':
+        search_list.append( os.path.abspath( source_root ) )
+    project_root= os.environ.get( 'MCP_PROJECT_ROOT', '' )
+    if project_root != '':
+        project_root= os.path.abspath( project_root )
+        search_list.append( os.path.join( project_root, 'Source' ) )
+        search_list.append( os.path.join( project_root, 'Plugins' ) )
+    engine_root= os.environ.get( 'MCP_ENGINE_ROOT', '' )
+    if engine_root != '':
+        engine_root= os.path.abspath( engine_root )
+        search_list.append( os.path.join( engine_root, 'Engine/Source' ) )
+        search_list.append( os.path.join( engine_root, 'Engine/Plugins' ) )
     full_name= search_file( search_list, base_name )
     print( 'load:', full_name, flush=True )
     if os.path.exists( full_name ):
@@ -152,17 +157,18 @@ class LogFile:
 log_fp= LogFile( 'output/issue_log.txt' )
 
 @tool.add
-def create_issue( title:str, description: str ) -> str:
+def create_issue( title:str, description: str, file_name: str ) -> str:
     """Add a new issue to the bug tracking system.
 
     Args:
         title: Issue title
         description: Issue description. Please include identifiable information such as file names and line numbers in the description along with the details of the issue.
+        file_name: Filename
     """
     global log_fp
     issue_id= log_fp.alloc_issue_id()
-    log_fp.write( '*** %d\n%s\n%s\n' % (issue_id,title,description) )
-    print( 'New Issue: %s' % title )
+    log_fp.write( '*** %d\n%s\n%s\n%s\n' % (issue_id,title,file_name,description) )
+    print( 'New Issue: %s (%s)' % (title,file_name) )
     print( '  desc: %s' % title, flush=True )
     return  'Issue created : "%s" id=%d' % (title,issue_id)
 

@@ -35,6 +35,7 @@ import TextLoader
 # I num_ctx     4096                    option
 # F temperature 0.7                     option
 # A tools       calculator              option
+# S base_url    http://localhost:11434
 # ====T system_prompt                   option
 # prompt
 # ====T base_prompt                     option
@@ -93,11 +94,21 @@ class Assistant:
     def load_preset( self, preset_name ):
         if self.config:
             self.options.base_url= self.config.get( 'base_url', self.options.base_url )
+            self.options.model_name= self.config.get( 'model_name', self.options.model_name )
+            self.options.num_ctx= self.config.get( 'num_ctx', self.options.num_ctx )
+            self.options.temperature= self.config.get( 'temperature', self.options.temperature )
+            self.options.top_k= self.config.get( 'top_k', self.options.top_k )
+            self.options.top_p= self.config.get( 'top_p', self.options.top_p )
+            self.options.min_p= self.config.get( 'min_p', self.options.min_p )
             if preset_name in self.config:
                 preset= self.config[preset_name]
+                self.options.base_url= preset.get( 'base_url', self.options.base_url )
                 self.options.model_name= preset.get( 'model', self.options.model_name )
                 self.options.num_ctx= preset.get( 'num_ctx', self.options.num_ctx )
                 self.options.temperature= preset.get( 'temperature', self.options.temperature )
+                self.options.top_k= preset.get( 'top_k', self.options.top_k )
+                self.options.top_p= preset.get( 'top_p', self.options.top_p )
+                self.options.min_p= preset.get( 'min_p', self.options.min_p )
                 self.options.tools.select_tools( preset['tools'] )
                 return  preset.get( 'base_prompt', None ),preset.get( 'system_prompt', None ),preset.get( 'header', '' )
         return  None,None,''
@@ -197,7 +208,7 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.21' )
+    print( 'Assistant v1.22' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )

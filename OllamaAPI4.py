@@ -53,6 +53,9 @@ class OllamaOptions(OptionBase):
         self.model_name= 'qwen3:8b'
         self.num_ctx= 8192
         self.temperature= -1.0
+        self.top_k= 0
+        self.top_p= 0.0
+        self.min_p= -1.0
         self.remove_think= True
         self.debug_echo= False
         self.tools= None
@@ -247,6 +250,12 @@ class OllamaAPI:
         }
         if self.options.temperature >= 0.0:
             params['options']['temperature']= self.options.temperature
+        if self.options.top_k > 0:
+            params['options']['top_k']= self.options.top_k
+        if self.options.top_p > 0.0:
+            params['options']['top_p']= self.options.top_p
+        if self.options.min_p >= 0.0:
+            params['options']['min_p']= self.options.min_p
         if tools:
             params['tools']= tools.get_tools()
         api_url= self.options.base_url + '/api/chat'
@@ -351,7 +360,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.20' )
+    print( 'OllamaAPI v4.21' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )
