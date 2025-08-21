@@ -3,7 +3,6 @@
 
 import sys
 import os
-import re
 
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
@@ -19,7 +18,7 @@ from OllamaAPI4 import OptionBase, ExecTime
 class AnalyzerOption(OptionBase):
     def __init__( self, **args ):
         super().__init__()
-        self.root= None
+        self.root= '.'
         self.project= None
         self.engine= None
         self.list_file= 'list.txt'
@@ -71,11 +70,13 @@ class CodeAnalyzer:
     def get_file_list( self, root ):
         file_list= FileListLib.FileListLib( '.code_analyzer_ignore' )
         file_list= file_list.find_file( root )
-        cpp_pat= re.compile( r'\.(c|cpp|h|hpp|inl)$' )
+        ext_set= set( ['.c', '.cpp', '.h', '.hpp', '.inl'] )
         file_list2= []
         for file_name in file_list:
-            pat= cpp_pat.search( file_name )
-            if pat:
+            _,ext= os.path.splitext( file_name )
+            if ext in ext_set:
+                if file_name.endswith( '.gen.cpp' ):
+                    continue
                 file_list2.append( file_name )
         return  file_list2
 
@@ -112,14 +113,13 @@ class CodeAnalyzer:
             }
             log_obj[issue_name]= issue_obj
 
-
         output_folder= self.options.output_folder
         if not os.path.exists( output_folder ):
             os.makedirs( output_folder )
         output_file= '%s/%s.txt' % (output_folder, os.path.basename(file_list[0]) )
         TextLoader.TextLoader().save( output_file, log_obj )
 
-    def analyze_1( self, root, file_list ):
+    def analyze_1( self, file_list ):
         prompt_text= ''
         for file_name in file_list:
             prompt_text+= '- %s\n' % os.path.basename(file_name)
@@ -156,7 +156,7 @@ class CodeAnalyzer:
         self.save_logs( response, prompt, file_list, issue_list )
         return  True
 
-    def analyze( self, root, file_list ):
+    def analyze( self, file_list ):
         with ExecTime( 'Analyze' ):
             file_set= set(file_list)
             analyze_count= 0
@@ -167,42 +167,38 @@ class CodeAnalyzer:
                     header_file= base + '.h'
                     if header_file in file_set:
                         analyze_list.append( header_file )
-                    if not self.analyze_1( root, analyze_list ):
+                    if not self.analyze_1( analyze_list ):
                         break
                     analyze_count+= 1
             print( 'Analyze: %d files' % analyze_count )
 
     #--------------------------------------------------------------------------
 
+    def get_root_folder( self ):
+        if self.options.project:
+            return  self.options.project
+        return  self.options.root
+
     def f_save_list( self ):
-        list_file= self.options['list_file']
-        self.file_list= self.file_list()
-        self.save_list( list_file, self.file_list )
+        if self.file_list is None:
+            self.file_list= self.get_file_list( self.get_root_folder() )
+        self.save_list( self.options.list_file, self.file_list )
 
     def f_load_list( self ):
-        list_file= self.options['list_file']
-        self.file_list= self.load_list( list_file )
+        self.file_list= self.load_list( self.options.list_file )
 
     #--------------------------------------------------------------------------
 
-    def get_source_folder( self ):
-        if self.options.root:
-            return  self.options.root
-        if self.options.project:
-            return  self.options.project
-        return  '.'
-
     def f_analyze( self ):
-        root= self.get_source_folder()
         if self.file_list is None:
-            self.file_list= self.get_file_list( root )
-        self.analyze( root, self.file_list )
+            self.file_list= self.get_file_list( self.get_root_folder() )
+        self.analyze( self.file_list )
 
 
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.00' )
+    print( 'CodeAnalyzer v1.01' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )
