@@ -7,6 +7,8 @@ import re
 import json
 import requests
 import base64
+import time
+import datetime
 
 #------------------------------------------------------------------------------
 
@@ -43,6 +45,43 @@ class OptionBase:
         for key in params:
             setattr( self, key, params[key] )
 
+    def merge_params( self, params, key_list ):
+        for key in key_list:
+            if key in params:
+                setattr( self, key, params[key] )
+
+#------------------------------------------------------------------------------
+
+class ExecTime:
+    def __init__( self, msg= None ):
+        self.msg= ''
+        if msg:
+            self.msg= msg + ' '
+
+    def get_time( self, sec ):
+        if sec > 60*60:
+            return  '%d:%02d:%05.2f' % (sec//(60*60), (sec//60)%60, sec - (sec//60)*60 )
+        elif sec > 60:
+            return  '%d:%05.2f' % (sec//60, sec - (sec//60)*60 )
+        return  '%.2f' % sec
+
+    def get_date( self ):
+        day= datetime.datetime.today()
+        return  '%04d/%02d/%02d %02d:%02d:%02d' % (day.year,day.month,day.day,day.hour,day.minute,day.second)
+
+    def __enter__( self ):
+        self.start_time= time.perf_counter()
+        self.start_date= self.get_date()
+        print( '\n%s Start [%s]\n' % (self.msg,self.start_date), flush=True )
+        return  self
+
+    def __exit__( self, *arg ):
+        total_time= time.perf_counter() - self.start_time
+        print( '\n%s%s (%.2f sec) [%s - %s]' % (self.msg, self.get_time( total_time ), total_time, self.start_date, self.get_date()), flush=True )
+        return  False
+
+#------------------------------------------------------------------------------
+
 class OllamaOptions(OptionBase):
     def __init__( self, **args ):
         super().__init__()
@@ -50,7 +89,7 @@ class OllamaOptions(OptionBase):
         self.provider= 'ollama2'
         self.system_role= 'system' # or developer
         self.timeout= 600
-        self.model_name= 'qwen3:8b'
+        self.model= 'qwen3:8b'
         self.num_ctx= 8192
         self.temperature= -1.0
         self.top_k= 0
@@ -60,6 +99,8 @@ class OllamaOptions(OptionBase):
         self.debug_echo= False
         self.tools= None
         self.apply_params( args )
+
+#------------------------------------------------------------------------------
 
 def image_to_base64( image_data ):
     encoded_byte= base64.b64encode( image_data )
@@ -85,7 +126,7 @@ class OllamaAPI:
                 self.dump_message( message )
             print( '=============', flush=True )
         params= {
-            'model': self.options.model_name,
+            'model': self.options.model,
             'messages': message_list,
             'num_ctx': self.options.num_ctx,
         }
@@ -193,7 +234,7 @@ class OllamaAPI:
 
     def generate_oai( self, text, system= None, image_data= None ):
         params= {
-            'model': self.options.model_name,
+            'model': self.options.model,
             'input': text,
         }
         if image_data:
@@ -232,7 +273,7 @@ class OllamaAPI:
 
     def generate_ollama( self, text, system= None, image_data= None ):
         params= {
-            'model': self.options.model_name,
+            'model': self.options.model,
             'prompt': text,
             'stream': False,
         }
@@ -308,7 +349,7 @@ class OllamaAPI:
                 self.dump_message( message )
             print( '=============', flush=True )
         params= {
-            'model': self.options.model_name,
+            'model': self.options.model,
             'messages': message_list,
             'stream': streaming,
             'options': {
@@ -425,7 +466,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.22' )
+    print( 'OllamaAPI v4.23' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )
@@ -451,7 +492,7 @@ def main( argv ):
             if arg == '--image':
                 ai= options.set_str( ai, argv, 'image_file' )
             elif arg == '--model':
-                ai= options.set_str( ai, argv, 'model_name' )
+                ai= options.set_str( ai, argv, 'model' )
             elif arg == '--host':
                 ai= options.set_str( ai, argv, 'base_url' )
             elif arg == '--provider':

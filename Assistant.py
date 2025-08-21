@@ -5,7 +5,9 @@ import sys
 import os
 import json
 
-sys.path.append( os.path.dirname(__file__) )
+lib_path= os.path.dirname(__file__)
+if lib_path not in sys.path:
+    sys.path.append( lib_path )
 import OllamaAPI4
 import SlackAPI
 import Functions
@@ -30,12 +32,24 @@ import TextLoader
 
 # config.txt
 # S base_url    http://localhost:11434
-# ======== preset-name1
+# S provider    provider                option
 # S model       model-name              option
 # I num_ctx     4096                    option
 # F temperature 0.7                     option
+# I top_k       20                      option
+# F top_p       1.0                     option
+# F min_p       0.0                     option
+# A env envname=envvalue ～             option
+# ======== preset-name1
+# S base_url    http://localhost:11434  option
+# S provider    provider                option
+# S model       model-name              option
+# I num_ctx     4096                    option
+# F temperature 0.7                     option
+# I top_k       20                      option
+# F top_p       1.0                     option
+# F min_p       0.0                     option
 # A tools       calculator              option
-# S base_url    http://localhost:11434
 # ====T system_prompt                   option
 # prompt
 # ====T base_prompt                     option
@@ -69,6 +83,20 @@ import TextLoader
 
 #------------------------------------------------------------------------------
 
+class AssistantOptions(OllamaAPI4.OllamaOptions):
+    def __init__( self, **args ):
+        super().__init__()
+        self.print= False
+        self.input_file= None
+        self.output_text= None
+        self.channel= None
+        self.config_file= 'config.txt'
+        self.preset= 'default'
+        self.env= []
+        self.apply_params( args )
+
+#------------------------------------------------------------------------------
+
 class Assistant:
     def __init__( self, options ):
         self.config= self.load_file( options.config_file )
@@ -93,24 +121,11 @@ class Assistant:
 
     def load_preset( self, preset_name ):
         if self.config:
-            self.options.base_url= self.config.get( 'base_url', self.options.base_url )
-            self.options.provider= self.config.get( 'provider', self.options.provider )
-            self.options.model_name= self.config.get( 'model_name', self.options.model_name )
-            self.options.num_ctx= self.config.get( 'num_ctx', self.options.num_ctx )
-            self.options.temperature= self.config.get( 'temperature', self.options.temperature )
-            self.options.top_k= self.config.get( 'top_k', self.options.top_k )
-            self.options.top_p= self.config.get( 'top_p', self.options.top_p )
-            self.options.min_p= self.config.get( 'min_p', self.options.min_p )
+            merge_key_list= [ 'base_url', 'provider', 'model', 'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'env' ]
+            self.options.merge_params( self.config, merge_key_list )
             if preset_name in self.config:
                 preset= self.config[preset_name]
-                self.options.base_url= preset.get( 'base_url', self.options.base_url )
-                self.options.provider= preset.get( 'provider', self.options.provider )
-                self.options.model_name= preset.get( 'model', self.options.model_name )
-                self.options.num_ctx= preset.get( 'num_ctx', self.options.num_ctx )
-                self.options.temperature= preset.get( 'temperature', self.options.temperature )
-                self.options.top_k= preset.get( 'top_k', self.options.top_k )
-                self.options.top_p= preset.get( 'top_p', self.options.top_p )
-                self.options.min_p= preset.get( 'min_p', self.options.min_p )
+                self.options.merge_params( preset, merge_key_list )
                 self.options.tools.select_tools( preset['tools'] )
                 return  preset.get( 'base_prompt', None ),preset.get( 'system_prompt', None ),preset.get( 'header', '' )
         return  None,None,''
@@ -133,7 +148,8 @@ class Assistant:
         if preset_system and system:
             system+= preset_system + '\n' + system
         if 'model' in input_obj:
-            self.options.model_name= input_obj['model']
+            self.options.model= input_obj['model']
+        self.set_env( self.options.env )
         if 'env' in input_obj:
             self.set_env( input_obj['env'] )
         header_text= input_obj.get( 'header', preset_header )
@@ -167,42 +183,43 @@ class Assistant:
     #--------------------------------------------------------------------------
 
     def f_post_or_save( self ):
-        if self.options.channel:
-            token= os.environ.get( 'SLACK_API_TOKEN', None )
-            if token is None:
-                print( 'SLACK_API_TOKEN must be set in the environment' ) 
+        with OllamaAPI4.ExecTime( 'Assistant' ):
+            if self.options.channel:
+                token= os.environ.get( 'SLACK_API_TOKEN', None )
+                if token is None:
+                    print( 'SLACK_API_TOKEN must be set in the environment' ) 
+                    return
+            input_obj= None
+            if self.options.input_file:
+                input_obj= self.load_file( self.options.input_file )
+            else:
+                print( 'Input file not found:', self.options.input_file )
                 return
-        input_obj= None
-        if self.options.input_file:
-            input_obj= self.load_file( self.options.input_file )
-        else:
-            print( 'Input file not found:', self.options.input_file )
-            return
-        response,status_code,prompt= self.generate_chain( input_obj )
-        if status_code != 200:
-            return
-        if self.options.channel:
-            api= SlackAPI.SlackAPI( token=token )
-            channel_name= self.options.channel
-            thread_ts= None
-            if ':' in channel_name:
-                params= channel_name.split(':')
-                channel_name= params[0]
-                thread_ts= params[1]
-            print( 'channel:', channel_name )
-            print( 'thrad_ts:', thread_ts, flush=True )
-            api.post_message(
-                        channel_name,
-                        text=None,
-                        markdown_text=response,
-                        thread_ts=thread_ts
-                    )
-        if self.options.output_text:
-            with open( self.options.output_text, 'w', encoding='utf-8' ) as fo:
-                fo.write( response )
-        if self.options.print:
-            print( '** INPUT\n', prompt )
-            print( '\n** RESPONSE\n', response, flush=True )
+            response,status_code,prompt= self.generate_chain( input_obj )
+            if status_code != 200:
+                return
+            if self.options.channel:
+                api= SlackAPI.SlackAPI( token=token )
+                channel_name= self.options.channel
+                thread_ts= None
+                if ':' in channel_name:
+                    params= channel_name.split(':')
+                    channel_name= params[0]
+                    thread_ts= params[1]
+                print( 'channel:', channel_name )
+                print( 'thrad_ts:', thread_ts, flush=True )
+                api.post_message(
+                            channel_name,
+                            text=None,
+                            markdown_text=response,
+                            thread_ts=thread_ts
+                        )
+            if self.options.output_text:
+                with open( self.options.output_text, 'w', encoding='utf-8' ) as fo:
+                    fo.write( response )
+            if self.options.print:
+                print( '** INPUT\n', prompt )
+                print( '\n** RESPONSE\n', response, flush=True )
 
     #--------------------------------------------------------------------------
 
@@ -210,12 +227,12 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.22' )
+    print( 'Assistant v1.24' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )
     print( '  --model <model_name>' )
-    print( '  --host <ollama_host>        (default: http://localhost:11434)' )
+    print( '  --host <server_url>         (default: http://localhost:11434)' )
     print( '  --provider <provider>' )
     print( '  --input <input.json|.txt>' )
     print( '  --num_ctx <num>' )
@@ -231,15 +248,14 @@ def usage():
 
 def main( argv ):
     acount= len(argv)
-    options= OllamaAPI4.OllamaOptions( print=False, input_file=None, output_text=None, channel=None, config_file='config.txt', preset='default' )
-    text_list= []
+    options= AssistantOptions()
     run_flag= False
     ai= 1
     while ai < acount:
         arg= argv[ai]
         if arg[0] == '-':
             if arg == '--model':
-                ai= options.set_str( ai, argv, 'model_name' )
+                ai= options.set_str( ai, argv, 'model' )
             elif arg == '--host':
                 ai= options.set_str( ai, argv, 'base_url' )
             elif arg == '--provider':

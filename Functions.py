@@ -66,7 +66,10 @@ class ToolManager:
         if func_name not in self.func_map:
             return  'Function "%s" not found' % func_name
         func_info,func= self.func_map[func_name]
-        result= str(func( **args ))
+        try:
+            result= str(func( **args ))
+        except TypeError as e:
+            return  'Argument mismatch in tool call. "%s"' % (str(e))
         if self.debug_echo:
             print( 'Call: %s(%s) result=%s' % (func_name,str(args),result), flush=True )
         return  result
@@ -103,7 +106,7 @@ def search_file( search_list, base_name ):
     return  base_name
 
 @tool.add
-def read_source_code( file_name: str ) -> str:
+def read_source_code( file_name:str ) -> str:
     """Read a source code.
     By simply specifying the file name, you can search the Project and Engine folders and read the file content.
     """
@@ -122,6 +125,9 @@ def read_source_code( file_name: str ) -> str:
         engine_root= os.path.abspath( engine_root )
         search_list.append( os.path.join( engine_root, 'Engine/Source' ) )
         search_list.append( os.path.join( engine_root, 'Engine/Plugins' ) )
+    ignore_set= set( ['.','..'] )
+    if base_name in ignore_set:
+        return  'Invalid filename "%s"' % file_name
     full_name= search_file( search_list, base_name )
     print( 'load:', full_name, flush=True )
     if os.path.exists( full_name ):
@@ -141,23 +147,24 @@ class LogFile:
     def open( self ):
         if self.fp is None:
             self.fp= open( self.file_name, 'w', encoding='utf-8' )
-    def alloc_issue_id( self ):
-        self.issue_id+= 1
-        return  self.issue_id
     def close( self ):
         if self.fp:
             self.fp.flush()
             self.fp.close()
             self.fp= None
-    def write( self, entry ):
+    def append( self, title, file_name, description ):
         if self.fp is None:
             self.open()
+        self.issue_id+= 1
+        entry= '%d,%s,%s\n%s\n\n' % (self.issue_id,title,file_name,description)
         self.fp.write( entry + '\n' )
+        return  self.issue_id
 
-log_fp= LogFile( 'output/issue_log.txt' )
+#issue_list= LogFile( 'output/issue_log.csv' )
+issue_list= None
 
 @tool.add
-def create_issue( title:str, description: str, file_name: str ) -> str:
+def create_issue( title:str, description:str, file_name:str ) -> str:
     """Add a new issue to the bug tracking system.
 
     Args:
@@ -165,9 +172,10 @@ def create_issue( title:str, description: str, file_name: str ) -> str:
         description: Issue description. Please include identifiable information such as file names and line numbers in the description along with the details of the issue.
         file_name: Filename
     """
-    global log_fp
-    issue_id= log_fp.alloc_issue_id()
-    log_fp.write( '*** %d\n%s\n%s\n%s\n' % (issue_id,title,file_name,description) )
+    global issue_list
+    issue_id= 0
+    if issue_list:
+        issue_id= issue_list.append( title, file_name, description )
     print( 'New Issue: %s (%s)' % (title,file_name) )
     print( '  desc: %s' % title, flush=True )
     return  'Issue created : "%s" id=%d' % (title,issue_id)

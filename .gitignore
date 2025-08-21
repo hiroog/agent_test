@@ -4,6 +4,7 @@ __pycache__
 *.zip
 /input/
 /output/
+/logs/
 config.json
 config.txt
 *.output.*
