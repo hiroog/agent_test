@@ -5,7 +5,8 @@ __pycache__
 /input/
 /output/
 /logs/
+/sources/
+/documents/
 config.json
 config.txt
-*.output.*
 list.txt

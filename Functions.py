@@ -4,6 +4,7 @@
 import os
 import inspect
 import random
+import re
 
 #------------------------------------------------------------------------------
 
@@ -75,6 +76,9 @@ class ToolManager:
         return  result
 
 tool= ToolManager()
+
+def get_tools():
+    return  tool
 
 #------------------------------------------------------------------------------
 
@@ -160,7 +164,6 @@ class LogFile:
         self.fp.write( entry + '\n' )
         return  self.issue_id
 
-#issue_list= LogFile( 'output/issue_log.csv' )
 issue_list= None
 
 @tool.add
@@ -182,6 +185,36 @@ def create_issue( title:str, description:str, file_name:str ) -> str:
 
 #------------------------------------------------------------------------------
 
-def get_tools():
-    return  tool
+def grep_file( folder, pat_key ):
+    result_text= '**Found documents**\n\n'
+    for root,dirs,files in os.walk( folder ):
+        for name in files:
+            full_path= os.path.join( root, name )
+            with open( full_path, 'r', encoding='utf-8', errors='ignore' ) as fi:
+                data= fi.read()
+                pat= pat_key.search( data )
+                if pat:
+                    result_text+= '====================\n'
+                    result_text+= 'Filename: "%s"\n' % name
+                    result_text+= 'File contents:\n\n\n'
+                    result_text+= data + '\n\n\n'
+    return  result_text
+
+@tool.add
+def search_in_files( pattern:str, case_sensitive:bool=True ) -> str:
+    """Returns the content found by searching the document. Search patterns can use Python's regular expressions.
+
+    Args:
+        pattern: Regular expressions
+        case_sensitive: If false, case sensitivity is ignored. The default is true.
+    """
+    flags= 0
+    if not case_sensitive:
+        flags|= re.IGNORECASE
+    pat_key= re.compile( pattern, flags )
+    folder_root= os.environ.get( 'MCP_FOLDER_ROOT', '' )
+    return  grep_file( folder_root, pat_key )
+
+#------------------------------------------------------------------------------
+
 
