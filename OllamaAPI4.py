@@ -446,7 +446,7 @@ class OllamaAPI:
     #--------------------------------------------------------------------------
 
     def generate( self, text, system= None, image_data= None ):
-        if self.options.provider == 'ollama2':
+        if self.options.provider.startswith( 'ollama' ):
             return  self.generate_ollama_chat( text, system, image_data )
         elif self.options.provider == 'lmstudio':
             return  self.chat_oai( text, system, image_data )

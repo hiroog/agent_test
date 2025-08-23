@@ -92,6 +92,7 @@ class AssistantOptions(OllamaAPI4.OllamaOptions):
         self.channel= None
         self.config_file= 'config.txt'
         self.preset= 'default'
+        self.nossl= False
         self.env= []
         self.apply_params( args )
 
@@ -199,7 +200,7 @@ class Assistant:
             if status_code != 200:
                 return
             if self.options.channel:
-                api= SlackAPI.SlackAPI( token=token )
+                api= SlackAPI.SlackAPI( token=token, nossl=self.options.nossl )
                 channel_name= self.options.channel
                 thread_ts= None
                 if ':' in channel_name:
@@ -276,6 +277,8 @@ def main( argv ):
                 ai= options.set_int( ai, argv, 'num_ctx' )
             elif arg == '--timeout':
                 ai= options.set_int( ai, argv, 'timeout' )
+            elif arg == '--nossl':
+                ai= options.nossl= True
             elif arg == '--print':
                 options.print= True
                 run_flag= True

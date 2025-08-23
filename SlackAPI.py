@@ -28,13 +28,20 @@ def load_json( file_name ):
 #-------------------------------------------------------------------------------
 
 class SlackAPI:
-    def __init__( self, token, cache=None ):
-        self.client = WebClient( token=token )
+    def __init__( self, token, cache_file=None, nossl=False ):
+        if nossl:
+            import ssl
+            ssl_context= ssl.create_default_context()
+            ssl_context.check_hostname=False
+            ssl_context.verify_mode= ssl.CERT_NONE
+            self.client = WebClient( token=token, ssl=ssl_context )
+        else:
+            self.client = WebClient( token=token )
         self.user_map= {}
         self.channel_map= {}
         self.cache_file= 'cache.json'
-        if cache:
-            self.cache_file= cache
+        if cache_file:
+            self.cache_file= cache_file
         self.load_cache()
 
     def load_cache( self ):

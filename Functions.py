@@ -185,8 +185,8 @@ def create_issue( title:str, description:str, file_name:str ) -> str:
 
 #------------------------------------------------------------------------------
 
-def grep_file( folder, pat_key ):
-    result_text= '**Found documents**\n\n'
+def grep_files( folder, pat_key ):
+    result_text= '**Found documents**:\n\n'
     for root,dirs,files in os.walk( folder ):
         for name in files:
             full_path= os.path.join( root, name )
@@ -194,15 +194,12 @@ def grep_file( folder, pat_key ):
                 data= fi.read()
                 pat= pat_key.search( data )
                 if pat:
-                    result_text+= '====================\n'
-                    result_text+= 'Filename: "%s"\n' % name
-                    result_text+= 'File contents:\n\n\n'
-                    result_text+= data + '\n\n\n'
+                    result_text+= '- %s\n' % name
     return  result_text
 
 @tool.add
 def search_in_files( pattern:str, case_sensitive:bool=True ) -> str:
-    """Returns the content found by searching the document. Search patterns can use Python's regular expressions.
+    """Searches the document and returns the filenames of the found files. Search patterns can use Python's regular expressions.
 
     Args:
         pattern: Regular expressions
@@ -211,9 +208,12 @@ def search_in_files( pattern:str, case_sensitive:bool=True ) -> str:
     flags= 0
     if not case_sensitive:
         flags|= re.IGNORECASE
-    pat_key= re.compile( pattern, flags )
+    try:
+        pat_key= re.compile( pattern, flags )
+    except re.PatternError as e:
+        return  str(e)
     folder_root= os.environ.get( 'MCP_FOLDER_ROOT', '' )
-    return  grep_file( folder_root, pat_key )
+    return  grep_files( folder_root, pat_key )
 
 #------------------------------------------------------------------------------
 
