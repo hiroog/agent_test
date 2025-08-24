@@ -3,6 +3,7 @@
 
 import sys
 import os
+import json
 
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
@@ -49,6 +50,7 @@ class CodeAnalyzer:
     def __init__( self, options ):
         self.options= options
         self.file_list= None
+        self.file_map= {}
         self.uemode= options.project is not None
         options= Assistant.AssistantOptions()
         if self.options.debug:
@@ -74,7 +76,28 @@ class CodeAnalyzer:
                 if line == '' or line[0] == '#':
                     continue
                 file_list.append( line )
-        return  file_list
+        return  file_list,{}
+
+    # [
+    #   {
+    #     "name": "file_name",
+    #     "users": [ "user1", "user2",.. ],
+    #     "date": "date-time",
+    #     "rev": "revision"
+    #   },
+    #   ...
+    # ]
+    def load_json( self, load_name ):
+        print( 'load:', load_name )
+        with open( load_name, 'r', encoding='utf-8' ) as fi:
+            json_obj= json.loads( fi.read() )
+        file_list= []
+        file_map= {}
+        for entry in json_obj:
+            file_name= entry.get('name','')
+            file_list.append( file_name )
+            file_map[file_name]= entry
+        return  file_list,file_map
 
     #--------------------------------------------------------------------------
 
@@ -99,38 +122,71 @@ class CodeAnalyzer:
 
     #--------------------------------------------------------------------------
 
+    def get_file_info( self, file_name ):
+        if file_name == '':
+            return  None
+        if file_name in self.file_map:
+            return  self.file_map[file_name]
+        base_name= os.path.basename(file_name)
+        for key in self.file_map:
+            if base_name == os.path.basename(key):
+                return  self.file_map[key]
+        return  None
+
+    def set_file_info( self, dest_obj, file_name, user_list ):
+        file_info= self.get_file_info( file_name )
+        if file_info:
+            if 'date' in file_info:
+                dest_obj['date']= file_info['date']
+            if 'rev' in file_info:
+                dest_obj['rev']= file_info['rev']
+            if 'users' in file_info:
+                user_list.extend( file_info['users'] )
+
     # ====== default
     # S file_name SOURCE
     # A sources SOURCE1 SOURCE2
     # I issue_count 1
+    # S date 2025/03/30
+    # S rev CL-0000
+    # S users username
     # ====T response
     # ～
     # ====== issue_1
     # S file_name SOURCE
+    # S date DATE
+    # S rev REV
     # ====T title
     # ～
     # ====T description
     # ～
 
     def save_logs( self, response, prompt, file_list, issue_list ):
-        log_obj= {
-                'default': {
-                    'response': response,
-                    'file_name': file_list[0],
-                    'sources': file_list,
-                    'issue_count': len(issue_list.logs),
-                }
-            }
+        log_obj= {}
+        default_obj= {
+            'response': response,
+            'file_name': file_list[0],
+            'sources': file_list,
+            'issue_count': len(issue_list.logs),
+        }
+        user_list= []
+        self.set_file_info( default_obj, file_list[0], user_list )
+        log_obj['default']= default_obj
+
         for issue in issue_list.logs:
             issue_id= issue[0]
             issue_name= 'issue_%d' % issue_id
+            file_name= issue[2]
             issue_obj= {
                 'issue_id': issue_id,
                 'title': issue[1],
-                'file_name': issue[2],
+                'file_name': file_name,
                 'description': issue[3],
             }
+            self.set_file_info( issue_obj, file_name, user_list )
             log_obj[issue_name]= issue_obj
+
+        log_obj['default']['users']= list( set(user_list) )
 
         log_dir= self.options.log_dir
         if not os.path.exists( log_dir ):
@@ -199,7 +255,11 @@ class CodeAnalyzer:
         self.save_list( self.options.list_file, self.file_list )
 
     def f_load_list( self ):
-        self.file_list= self.load_list( self.options.list_file )
+        list_file= self.options.list_file
+        if list_file.endswith( '.json' ):
+            self.file_list,self.file_map= self.load_json( list_file )
+        else:
+            self.file_list,self.file_map= self.load_list( list_file )
 
     def f_clear_logdir( self ):
         log_dir= self.options.log_dir
@@ -238,33 +298,36 @@ class PostTool:
             thread_ts= parent_response.get('ts', None)
         return  self.api.post_message( channel_name, text, blocks, markdown_text, thread_ts )
 
-    def post_1( self, file_name ):
-        analyzed_obj= TextLoader.TextLoader().load( file_name )
+    def post_1( self, log_file_name ):
+        analyzed_obj= TextLoader.TextLoader().load( log_file_name )
         default_obj= analyzed_obj.get( 'default', None )
         if default_obj is None:
             return
         file_name_full= default_obj.get( 'file_name', '' )
-        file_name= os.path.basename(file_name_full)
+        base_file_name= os.path.basename(file_name_full)
         issue_count= default_obj.get( 'issue_count', 0 )
         if issue_count == 0:
-            print( 'skip: %s' % file_name )
+            print( 'skip: %s' % file_name_full )
             return
 
-        issue_map= {}
-        for key in analyzed_obj:
-            if key.startswith( 'issue_' ):
-                obj= analyzed_obj[key]
-                issue_id= obj.get('issue_id',0)
-                title= obj.get('title','')
-                file_name= obj.get('file_name','')
-                description= obj.get('description','')
-                if issue_id >= 1:
-                    issue_map[issue_id]= issue_id,title,file_name,description
-        text=  '*Code review*\n'
-        text+= '%s\n' % file_name
+        user_list= default_obj.get( 'users', [] )
+        user_menthon= ' '.join( ['@'+user for user in user_list] )
+
+        text= user_menthon + '\n'
+        text+= '*Code review*\n'
+        text+= '%s\n' % base_file_name
         text+= 'Issues: %d\n\n' % issue_count
-        for issue_id in range(1,issue_id+1):
-            text+= '%d. %s\n' % (issue_id,issue_map[issue_id][1])
+        for issue_id in range(1,issue_count+1):
+            obj= {}
+            key= 'issue_%d' % issue_id
+            if key in analyzed_obj:
+                obj= analyzed_obj[key]
+            title= obj.get( 'title', '' )
+            file_name= obj.get( 'file_name', '' )
+            if file_name != base_file_name:
+                text+= '%d. %s (%s)\n' % (issue_id,title,file_name)
+            else:
+                text+= '%d. %s\n' % (issue_id,title)
         blocks= [
             {
                 'type': 'section',
@@ -278,11 +341,21 @@ class PostTool:
         response= self.post_message( self.options.channel, text=text, blocks=blocks )
 
         for issue_id in range(1,issue_count+1):
-            _,title,file_name,description= issue_map[issue_id]
+            obj= {}
+            key= 'issue_%d' % issue_id
+            if key in analyzed_obj:
+                obj= analyzed_obj[key]
+            title= obj.get( 'title', '' )
+            file_name= obj.get( 'file_name', '' )
+            description= obj.get( 'description', '' )
+            date= obj.get( 'date', None )
+            rev= obj.get( 'rev', None )
             text=  '# 🔴 %d. %s\n\n' % (issue_id,title)
             text+= '- %s\n\n' % file_name
+            if date:
+                text+= '更新日: %s\n\n' % date
             text+= '## 内容\n\n'
-            text+= description + '\n'
+            text+= description + '\n\n　\n'
             response= self.post_message( self.options.channel, text=None, blocks=None, markdown_text=text, parent_response=response )
 
         text= '# 🔵 %s\n\n' % file_name
@@ -303,7 +376,7 @@ class PostTool:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.02 Hiroyuki Ogasawara' )
+    print( 'CodeAnalyzer v1.10 Hiroyuki Ogasawara' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )

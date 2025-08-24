@@ -57,7 +57,7 @@ class TextLoader:
             params= line.split()
             param_type= params[0]
             if param_type == 'S':
-                map_obj[params[1]]= params[2]
+                map_obj[params[1]]= line[len(params[1])+2:].strip()
             elif param_type == 'I':
                 map_obj[params[1]]= int(params[2])
             elif param_type == 'F':

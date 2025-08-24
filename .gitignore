@@ -10,5 +10,6 @@ __pycache__
 config.json
 config.txt
 list.txt
+list.json
 log.txt
 pytee.py
