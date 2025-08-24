@@ -11,6 +11,7 @@ import Assistant
 import FileListLib
 import Functions
 import TextLoader
+import SlackAPI
 from OllamaAPI4 import OptionBase, ExecTime
 
 #------------------------------------------------------------------------------
@@ -22,9 +23,13 @@ class AnalyzerOption(OptionBase):
         self.project= None
         self.engine= None
         self.list_file= 'list.txt'
-        self.output_folder= 'logs'
+        self.log_dir= 'logs'
         self.preset= 'cppreview'
         self.debug= False
+        #---------------------------
+        self.cache_file= 'cache.json'
+        self.channel= None
+        #---------------------------
         self.apply_params( args )
 
 #------------------------------------------------------------------------------
@@ -44,6 +49,12 @@ class CodeAnalyzer:
     def __init__( self, options ):
         self.options= options
         self.file_list= None
+        self.uemode= options.project is not None
+        options= Assistant.AssistantOptions()
+        if self.options.debug:
+            options.print= True
+            options.debug_echo= True
+        self.assistant= Assistant.Assistant( options )
 
     #--------------------------------------------------------------------------
 
@@ -70,13 +81,19 @@ class CodeAnalyzer:
     def get_file_list( self, root ):
         file_list= FileListLib.FileListLib( '.code_analyzer_ignore' )
         file_list= file_list.find_file( root )
-        ext_set= set( ['.c', '.cpp', '.h', '.hpp', '.inl'] )
+        ext_set_h= set( ['.h', '.hpp', '.inl'] )
+        ext_set_c= set( ['.c', '.cpp'] )
         file_list2= []
         for file_name in file_list:
             _,ext= os.path.splitext( file_name )
-            if ext in ext_set:
-                if file_name.endswith( '.gen.cpp' ):
-                    continue
+            if ext in ext_set_h:
+                file_list2.append( file_name )
+            elif ext in ext_set_c:
+                if self.uemode:
+                    if file_name.endswith( '.gen.cpp' ):
+                        continue
+                    if '/Intermediate/' in file_name:
+                        continue
                 file_list2.append( file_name )
         return  file_list2
 
@@ -85,6 +102,7 @@ class CodeAnalyzer:
     # ====== default
     # S file_name SOURCE
     # A sources SOURCE1 SOURCE2
+    # I issue_count 1
     # ====T response
     # ～
     # ====== issue_1
@@ -100,6 +118,7 @@ class CodeAnalyzer:
                     'response': response,
                     'file_name': file_list[0],
                     'sources': file_list,
+                    'issue_count': len(issue_list.logs),
                 }
             }
         for issue in issue_list.logs:
@@ -113,10 +132,10 @@ class CodeAnalyzer:
             }
             log_obj[issue_name]= issue_obj
 
-        output_folder= self.options.output_folder
-        if not os.path.exists( output_folder ):
-            os.makedirs( output_folder )
-        output_file= '%s/%s.txt' % (output_folder, os.path.basename(file_list[0]) )
+        log_dir= self.options.log_dir
+        if not os.path.exists( log_dir ):
+            os.makedirs( log_dir )
+        output_file= '%s/%s.txt' % (log_dir, os.path.basename(file_list[0]) )
         TextLoader.TextLoader().save( output_file, log_obj )
 
     def analyze_1( self, file_list ):
@@ -138,18 +157,13 @@ class CodeAnalyzer:
         if self.options.debug:
             print( 'input:', input_obj )
 
-        options= Assistant.AssistantOptions()
-        if self.options.debug:
-            options.print= True
-            options.debug_echo= True
-
         issue_list= IssueList()
         Functions.issue_list= issue_list
 
         with ExecTime( 'Generate' ):
-            assistant= Assistant.Assistant( options )
-            response,status_code,prompt= assistant.generate_chain( input_obj )
+            response,status_code,prompt= self.assistant.generate_chain( input_obj )
 
+        Functions.issue_list= None
         if status_code != 200:
             return  False
 
@@ -187,6 +201,12 @@ class CodeAnalyzer:
     def f_load_list( self ):
         self.file_list= self.load_list( self.options.list_file )
 
+    def f_clear_logdir( self ):
+        log_dir= self.options.log_dir
+        if os.path.exists( log_dir ):
+            import shutil
+            shutil.rmtree( log_dir )
+
     #--------------------------------------------------------------------------
 
     def f_analyze( self ):
@@ -194,27 +214,115 @@ class CodeAnalyzer:
             self.file_list= self.get_file_list( self.get_root_folder() )
         self.analyze( self.file_list )
 
+    #--------------------------------------------------------------------------
+
+    def f_post( self ):
+        post_tool= PostTool( self.options )
+        post_tool.post_all()
+
+
+#------------------------------------------------------------------------------
+
+class PostTool:
+    def __init__( self, options ):
+        self.options= options
+        token= os.environ.get( 'SLACK_API_TOKEN', None )
+        if token is None:
+            print( 'SLACK_API_TOKEN not found in environment variables.' )
+            return
+        self.api= SlackAPI.SlackAPI( token, self.options.cache_file )
+
+    def post_message( self, channel_name, text, blocks=None, markdown_text=None, parent_response= None ):
+        thread_ts= None
+        if parent_response:
+            thread_ts= parent_response.get('ts', None)
+        return  self.api.post_message( channel_name, text, blocks, markdown_text, thread_ts )
+
+    def post_1( self, file_name ):
+        analyzed_obj= TextLoader.TextLoader().load( file_name )
+        default_obj= analyzed_obj.get( 'default', None )
+        if default_obj is None:
+            return
+        file_name_full= default_obj.get( 'file_name', '' )
+        file_name= os.path.basename(file_name_full)
+        issue_count= default_obj.get( 'issue_count', 0 )
+        if issue_count == 0:
+            print( 'skip: %s' % file_name )
+            return
+
+        issue_map= {}
+        for key in analyzed_obj:
+            if key.startswith( 'issue_' ):
+                obj= analyzed_obj[key]
+                issue_id= obj.get('issue_id',0)
+                title= obj.get('title','')
+                file_name= obj.get('file_name','')
+                description= obj.get('description','')
+                if issue_id >= 1:
+                    issue_map[issue_id]= issue_id,title,file_name,description
+        text=  '*Code review*\n'
+        text+= '%s\n' % file_name
+        text+= 'Issues: %d\n\n' % issue_count
+        for issue_id in range(1,issue_id+1):
+            text+= '%d. %s\n' % (issue_id,issue_map[issue_id][1])
+        blocks= [
+            {
+                'type': 'section',
+                'expand': True,
+                'text': {
+                    'type': 'mrkdwn',
+                    'text': text,
+                },
+            },
+        ]
+        response= self.post_message( self.options.channel, text=text, blocks=blocks )
+
+        for issue_id in range(1,issue_count+1):
+            _,title,file_name,description= issue_map[issue_id]
+            text=  '# 🔴 %d. %s\n\n' % (issue_id,title)
+            text+= '- %s\n\n' % file_name
+            text+= '## 内容\n\n'
+            text+= description + '\n'
+            response= self.post_message( self.options.channel, text=None, blocks=None, markdown_text=text, parent_response=response )
+
+        text= '# 🔵 %s\n\n' % file_name
+        text+= '%s\n\n' % default_obj.get('response','')
+        response= self.post_message( self.options.channel, text=None, blocks=None, markdown_text=text, parent_response=response )
+
+    def post_all( self ):
+        with os.scandir( self.options.log_dir ) as di:
+            for entry in di:
+                if entry.name.startswith( '.' ) or not entry.is_file():
+                    continue
+                _,ext= os.path.splitext( entry.name )
+                if ext == '.txt':
+                    full_path= os.path.join( self.options.log_dir, entry.name )
+                    self.post_1( full_path )
+
 
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.01' )
+    print( 'CodeAnalyzer v1.02 Hiroyuki Ogasawara' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )
     print( '  --project <project_folder>  default None' )
     print( '  --engine <engine_folder>    default None' )
     print( '  --list <sources_list>       default list.txt' )
-    print( '  --output <output_folder>    default logs' )
+    print( '  --logdir <output_folder>    default logs' )
     print( '  --preset <preset_name>      default cppreview' )
     print( '  --save_list' )
     print( '  --load_list' )
+    print( '  --clar_logdir' )
     print( '  --analyze' )
+    print( '  --post <channel>' )
     print( '  --debug' )
     print( 'ex. CodeAnalyzer.py --root PROJECT_ROOT --analyze' )
     print( 'ex. CodeAnalyzer.py --project PROJECT_ROOT --engine ENGINE_ROOT --analyze' )
     print( 'ex. CodeAnalyzer.py --root PROJECT_ROOT --save_list' )
-    print( 'ex. CodeAnalyzer.py --load_list --analyze' )
+    print( 'ex. CodeAnalyzer.py --load_list --root PROJECT_ROOT --analyze' )
+    print( 'ex. CodeAnalyzer.py --logdir LOG_DIR --post CHANNEL' )
     sys.exit( 1 )
 
 
@@ -234,10 +342,15 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'engine' )
             elif arg == '--list':
                 ai= options.set_str( ai, argv, 'list_file' )
-            elif arg == '--output':
-                ai= options.set_str( ai, argv, 'output_folder' )
+            elif arg == '--logdir':
+                ai= options.set_str( ai, argv, 'log_dir' )
             elif arg == '--preset':
                 ai= options.set_str( ai, argv, 'preset' )
+            elif arg == '--post':
+                ai= options.set_str( ai, argv, 'channel' )
+                func_list.append( 'f_post' )
+            elif arg == '--clear_logdir':
+                func_list.append( 'f_clear_logdir' )
             elif arg == '--save_list':
                 func_list.append( 'f_save_list' )
             elif arg == '--load_list':

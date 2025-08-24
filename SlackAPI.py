@@ -72,6 +72,8 @@ class SlackAPI:
         return  all_channels
 
     def get_channel_id( self, channel_name ):
+        if channel_name.startswith( '#' ):
+            channel_name= channel_name[1:]
         if channel_name in self.channel_map:
             return  self.channel_map[channel_name]
         try:
@@ -121,6 +123,7 @@ class SlackAPI:
 #-------------------------------------------------------------------------------
 
 def usage():
+    print( 'SlackAPI.py v2.00 Hiroyuki Ogasawara' )
     print( 'Usage: python SlackAPI.py' )
     print( 'SLACK_API_TOKEN must be set in the environment.' )
     print( 'options:' )

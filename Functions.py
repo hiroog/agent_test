@@ -72,7 +72,10 @@ class ToolManager:
         except TypeError as e:
             return  'Argument mismatch in tool call. "%s"' % (str(e))
         if self.debug_echo:
-            print( 'Call: %s(%s) result=%s' % (func_name,str(args),result), flush=True )
+            if len(result) <= 128:
+                print( 'Call: %s(%s) result=%s' % (func_name,str(args),result), flush=True )
+            else:
+                print( 'Call: %s(%s) result=%d chars' % (func_name,str(args),len(result)), flush=True )
         return  result
 
 tool= ToolManager()

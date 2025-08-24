@@ -104,6 +104,8 @@ class Assistant:
         options.tools= Functions.get_tools()
         options.tools.debug_echo= options.debug_echo
         self.options= options
+        self.load_preset( options.preset )
+        self.set_env( self.options.env )
         self.ollama_api= OllamaAPI4.OllamaAPI( options )
 
     #--------------------------------------------------------------------------
@@ -228,7 +230,7 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.24' )
+    print( 'Assistant v1.25 Hiroyuki Ogasawara' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )

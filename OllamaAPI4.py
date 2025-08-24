@@ -214,8 +214,8 @@ class OllamaAPI:
                         data= ''
                         if tools:
                             data= tools.call_func( func_name, arguments )
-                        if self.options.debug_echo:
-                            print( '**TOOL**', data, flush=True )
+                        #if self.options.debug_echo:
+                        #    print( '**TOOL**', data, flush=True )
                         message= {
                                 'role': 'tool',
                                 'name': func_name,
@@ -428,8 +428,8 @@ class OllamaAPI:
                         data= ''
                         if tools:
                             data= tools.call_func( func_name, arguments )
-                        if self.options.debug_echo:
-                            print( '**TOOL**', data, flush=True )
+                        #if self.options.debug_echo:
+                        #    print( '**TOOL**', data, flush=True )
                         message= {
                                 'role': 'tool',
                                 'tool_name': func_name,
@@ -466,7 +466,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.23' )
+    print( 'OllamaAPI v4.25 Hiroyuki Ogasawara' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )

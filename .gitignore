@@ -10,3 +10,5 @@ __pycache__
 config.json
 config.txt
 list.txt
+log.txt
+pytee.py
