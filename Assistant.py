@@ -49,6 +49,7 @@ import TextLoader
 # I top_k       20                      option
 # F top_p       1.0                     option
 # F min_p       0.0                     option
+# A env envname=envvalue ～             option
 # A tools       calculator              option
 # ====T system_prompt                   option
 # prompt
@@ -56,6 +57,8 @@ import TextLoader
 # prompt
 # ======== preset-name2
 # A chain       preset-name1 preset-name2 ..
+# ======== preset-name3
+# S include_prompt prompt.md            option
 
 # input_file.json
 # {
@@ -93,6 +96,7 @@ class AssistantOptions(OllamaAPI4.OllamaOptions):
         self.config_file= 'config.txt'
         self.preset= 'default'
         self.nossl= False
+        self.prompt_dir= '.'
         self.env= []
         self.apply_params( args )
 
@@ -122,6 +126,17 @@ class Assistant:
         loader= TextLoader.TextLoader()
         return  loader.load( file_name )
 
+    def load_prompt( self, file_name, base_prompt ):
+        prompt_file= os.path.join( self.options.prompt_dir, file_name )
+        if os.path.exists( prompt_file ):
+            print( 'load:', prompt_file, flush=True )
+            with open( prompt_file, 'r', encoding='utf-8' ) as fi:
+                prompt= fi.read()
+            if base_prompt:
+                return  base_prompt + prompt
+            return  prompt
+        return  base_prompt
+
     def load_preset( self, preset_name ):
         if self.config:
             merge_key_list= [ 'base_url', 'provider', 'model', 'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'env' ]
@@ -130,7 +145,10 @@ class Assistant:
                 preset= self.config[preset_name]
                 self.options.merge_params( preset, merge_key_list )
                 self.options.tools.select_tools( preset['tools'] )
-                return  preset.get( 'base_prompt', None ),preset.get( 'system_prompt', None ),preset.get( 'header', '' )
+                prompt= preset.get( 'base_prompt', None )
+                if 'include_prompt' in preset:
+                    prompt= self.load_prompt( preset['include_prompt'], prompt )
+                return  prompt,preset.get( 'system_prompt', None ),preset.get( 'header', '' )
         return  None,None,''
 
     def set_env( self, env_list ):
@@ -185,6 +203,9 @@ class Assistant:
 
     #--------------------------------------------------------------------------
 
+    def stat_dump( self ):
+        self.ollama_api.stat_dump()
+
     def f_post_or_save( self ):
         with OllamaAPI4.ExecTime( 'Assistant' ):
             if self.options.channel:
@@ -217,12 +238,15 @@ class Assistant:
                             markdown_text=response,
                             thread_ts=thread_ts
                         )
+                api.save_cache()
             if self.options.output_text:
                 with open( self.options.output_text, 'w', encoding='utf-8' ) as fo:
                     fo.write( response )
             if self.options.print:
                 print( '** INPUT\n', prompt )
                 print( '\n** RESPONSE\n', response, flush=True )
+            if self.options.debug_echo:
+                self.stat_dump()
 
     #--------------------------------------------------------------------------
 
@@ -230,7 +254,7 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.25 Hiroyuki Ogasawara' )
+    print( 'Assistant v1.27 Hiroyuki Ogasawara' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )
@@ -240,6 +264,7 @@ def usage():
     print( '  --input <input.json|.txt>' )
     print( '  --num_ctx <num>' )
     print( '  --config <config.txt>' )
+    print( '  --prompt_dir <prompt_dir>' )
     print( '  --save <output.txt>' )
     print( '  --post <channel>' )
     print( '  --timeout <sec>             (default: 600)' )
@@ -275,6 +300,8 @@ def main( argv ):
                 run_flag= True
             elif arg == '--config':
                 ai= options.set_str( ai, argv, 'config_file' )
+            elif arg == '--prompt_dir':
+                ai= options.set_str( ai, argv, 'prompt_dir' )
             elif arg == '--num_ctx':
                 ai= options.set_int( ai, argv, 'num_ctx' )
             elif arg == '--timeout':

@@ -26,9 +26,10 @@ class AnalyzerOption(OptionBase):
         self.list_file= 'list.txt'
         self.log_dir= 'logs'
         self.preset= 'cppreview'
+        self.prompt_dir= '.'
         self.debug= False
         #---------------------------
-        self.cache_file= 'cache.json'
+        self.cache_file= 'slack_cache.json'
         self.channel= None
         #---------------------------
         self.apply_params( args )
@@ -52,7 +53,7 @@ class CodeAnalyzer:
         self.file_list= None
         self.file_map= {}
         self.uemode= options.project is not None
-        options= Assistant.AssistantOptions()
+        options= Assistant.AssistantOptions( prompt_dir=options.prompt_dir )
         if self.options.debug:
             options.print= True
             options.debug_echo= True
@@ -241,6 +242,8 @@ class CodeAnalyzer:
                         break
                     analyze_count+= 1
             print( 'Analyze: %d files' % analyze_count )
+        if self.options.debug:
+            self.assistant.stat_dump()
 
     #--------------------------------------------------------------------------
 
@@ -371,20 +374,22 @@ class PostTool:
                 if ext == '.txt':
                     full_path= os.path.join( self.options.log_dir, entry.name )
                     self.post_1( full_path )
+        self.api.save_cache()
 
 
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.10 Hiroyuki Ogasawara' )
+    print( 'CodeAnalyzer v1.12 Hiroyuki Ogasawara' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )
     print( '  --project <project_folder>  default None' )
     print( '  --engine <engine_folder>    default None' )
     print( '  --list <sources_list>       default list.txt' )
-    print( '  --logdir <output_folder>    default logs' )
+    print( '  --log_dir <output_folder>   default logs' )
     print( '  --preset <preset_name>      default cppreview' )
+    print( '  --prompt_dir <prompt_dir>   default .' )
     print( '  --save_list' )
     print( '  --load_list' )
     print( '  --clar_logdir' )
@@ -415,8 +420,10 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'engine' )
             elif arg == '--list':
                 ai= options.set_str( ai, argv, 'list_file' )
-            elif arg == '--logdir':
+            elif arg == '--log_dir':
                 ai= options.set_str( ai, argv, 'log_dir' )
+            elif arg == '--prompt_dir':
+                ai= options.set_str( ai, argv, 'prompt_dir' )
             elif arg == '--preset':
                 ai= options.set_str( ai, argv, 'preset' )
             elif arg == '--post':

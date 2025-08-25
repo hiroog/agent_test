@@ -39,7 +39,7 @@ class SlackAPI:
             self.client = WebClient( token=token )
         self.user_map= {}
         self.channel_map= {}
-        self.cache_file= 'cache.json'
+        self.cache_file= 'slack_cache.json'
         if cache_file:
             self.cache_file= cache_file
         self.load_cache()
@@ -123,7 +123,7 @@ class SlackAPI:
 #-------------------------------------------------------------------------------
 
 def usage():
-    print( 'SlackAPI.py v2.00 Hiroyuki Ogasawara' )
+    print( 'SlackAPI.py v2.01 Hiroyuki Ogasawara' )
     print( 'Usage: python SlackAPI.py' )
     print( 'SLACK_API_TOKEN must be set in the environment.' )
     print( 'options:' )

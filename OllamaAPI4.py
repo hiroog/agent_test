@@ -116,6 +116,36 @@ def load_image( image_path ):
 class OllamaAPI:
     def __init__( self, options ):
         self.options= options
+        self.stat_reset()
+
+    #--------------------------------------------------------------------------
+
+    def stat_reset( self ):
+        self.stat_list= []
+
+    def stat_add( self, input_tokens, output_tokens, request_time ):
+        self.stat_list.append( (input_tokens,output_tokens,request_time) )
+        if self.options.debug_echo:
+            print( '# input=%d  output=%d  %f token/s' % (input_tokens,output_tokens,output_tokens/request_time) )
+
+    def stat_dump( self ):
+        request_count= len(self.stat_list)
+        total_input= 0
+        total_output= 0
+        max_input= 0
+        max_output= 0
+        total_sec= 0.0
+        for itokens,otokens,rtime in self.stat_list:
+            total_input+= itokens
+            total_output+= otokens
+            max_input= max(max_input,itokens)
+            max_output= max(max_output,otokens)
+            total_sec+= rtime
+        print( '# request_count=%d' % request_count )
+        if request_count != 0:
+            print( '# total_input=%d  max_input=%d' % (total_input,max_input) )
+            print( '# total_output=%d  max_output=%d' % (total_output,max_output) )
+            print( '# total %f token/s' % (total_output/total_sec) )
 
     #--------------------------------------------------------------------------
 
@@ -153,7 +183,9 @@ class OllamaAPI:
             'Authorization': 'Bearer %s' % os.environ.get('OPENAI_API_KEY', 'lm-studio'),
         }
         try:
+            start_time= time.perf_counter()
             result= requests.post( api_url, headers=headers, data=data, timeout=self.options.timeout )
+            request_time= time.perf_counter() - start_time
         except Exception as e:
             return  '',408
         if result.status_code == 200:
@@ -162,6 +194,9 @@ class OllamaAPI:
                 print( '============= Response' )
                 self.dump_response( data )
                 print( '=============' )
+            if 'usage' in data:
+                usage= data['usage']
+                self.stat_add( usage.get('completion_tokens',0), usage.get('prompt_tokens',0), request_time )
             message= data['choices'][0]['message']
             return  message,result.status_code
         else:
@@ -375,7 +410,9 @@ class OllamaAPI:
             'Authorization': 'Bearer %s' % os.environ.get('OLLAMA_API_KEY', os.environ.get( 'OPENAI_API_KEY', None) ),
         }
         try:
+            start_time= time.perf_counter()
             result= requests.post( api_url, headers=headers, data=data, timeout=self.options.timeout )
+            request_time= time.perf_counter() - start_time
         except Exception as e:
             return  None,408
         if result.status_code == 200:
@@ -387,6 +424,7 @@ class OllamaAPI:
                 print( '============= Response' )
                 self.dump_response( data )
                 print( '=============' )
+            self.stat_add( data.get('eval_count',0), data.get('prompt_eval_count',0), request_time )
             message= data['message']
             return  message,result.status_code
         else:
@@ -466,7 +504,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.25 Hiroyuki Ogasawara' )
+    print( 'OllamaAPI v4.27 Hiroyuki Ogasawara' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )

@@ -9,7 +9,8 @@ __pycache__
 /documents/
 config.json
 config.txt
-list.txt
-list.json
-log.txt
+list*.txt
+list*.json
+log*.txt
 pytee.py
+*_cache.json
