@@ -31,6 +31,7 @@ class AnalyzerOption(OptionBase):
         #---------------------------
         self.cache_file= 'slack_cache.json'
         self.channel= None
+        self.nossl= False
         #---------------------------
         self.apply_params( args )
 
@@ -293,7 +294,7 @@ class PostTool:
         if token is None:
             print( 'SLACK_API_TOKEN not found in environment variables.' )
             return
-        self.api= SlackAPI.SlackAPI( token, self.options.cache_file )
+        self.api= SlackAPI.SlackAPI( token, self.options.cache_file, self.options.nossl )
 
     def post_message( self, channel_name, text, blocks=None, markdown_text=None, parent_response= None ):
         thread_ts= None
@@ -380,7 +381,7 @@ class PostTool:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.12 Hiroyuki Ogasawara' )
+    print( 'CodeAnalyzer v1.13 Hiroyuki Ogasawara' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )
@@ -395,12 +396,13 @@ def usage():
     print( '  --clar_logdir' )
     print( '  --analyze' )
     print( '  --post <channel>' )
+    print( '  --nossl' )
     print( '  --debug' )
     print( 'ex. CodeAnalyzer.py --root PROJECT_ROOT --analyze' )
     print( 'ex. CodeAnalyzer.py --project PROJECT_ROOT --engine ENGINE_ROOT --analyze' )
     print( 'ex. CodeAnalyzer.py --root PROJECT_ROOT --save_list' )
     print( 'ex. CodeAnalyzer.py --load_list --root PROJECT_ROOT --analyze' )
-    print( 'ex. CodeAnalyzer.py --logdir LOG_DIR --post CHANNEL' )
+    print( 'ex. CodeAnalyzer.py --log_dir LOG_DIR --post CHANNEL' )
     sys.exit( 1 )
 
 
@@ -437,6 +439,8 @@ def main( argv ):
                 func_list.append( 'f_load_list' )
             elif arg == '--analyze':
                 func_list.append( 'f_analyze' )
+            elif arg == '--nossl':
+                options.nossl= True
             elif arg == '--debug':
                 options.debug= True
             else:
