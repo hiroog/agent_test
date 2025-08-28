@@ -158,7 +158,7 @@ class OllamaAPI:
         params= {
             'model': self.options.model,
             'messages': message_list,
-            'num_ctx': self.options.num_ctx,
+            #'num_ctx': self.options.num_ctx,
         }
         if tools:
             params['tools']= tools.get_tools()
@@ -486,10 +486,8 @@ class OllamaAPI:
     def generate( self, text, system= None, image_data= None ):
         if self.options.provider.startswith( 'ollama' ):
             return  self.generate_ollama_chat( text, system, image_data )
-        elif self.options.provider == 'lmstudio':
+        elif self.options.provider == 'lmstudio' or self.options.provider == 'openai':
             return  self.chat_oai( text, system, image_data )
-        #elif self.options.provider == 'openai':
-        #    return  self.generate_oai( text, system, image_data )
         return  '',400
 
     #--------------------------------------------------------------------------
@@ -504,7 +502,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.27 Hiroyuki Ogasawara' )
+    print( 'OllamaAPI v4.28 Hiroyuki Ogasawara' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )

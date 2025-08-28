@@ -3,7 +3,7 @@ __pycache__
 *.7z
 *.zip
 /input/
-/output/
+/output*/
 /logs/
 /sources/
 /documents/

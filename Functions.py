@@ -16,8 +16,10 @@ class ToolManager:
 
     def get_function_info( self, func ):
         type_to_name= {
-            'int': 'int',
+            'int': 'integer',
             'str': 'string',
+            'bool': 'boolean',
+            'float': 'number',
         }
         func_info= {
             'name': func.__name__,
@@ -188,25 +190,37 @@ def create_issue( title:str, description:str, file_name:str ) -> str:
 
 #------------------------------------------------------------------------------
 
-def grep_files( folder, pat_key ):
+def grep_files( folder, pat_key, filename, content ):
     result_text= '**Found documents**:\n\n'
+    found_files= 0
     for root,dirs,files in os.walk( folder ):
         for name in files:
             full_path= os.path.join( root, name )
-            with open( full_path, 'r', encoding='utf-8', errors='ignore' ) as fi:
-                data= fi.read()
-                pat= pat_key.search( data )
+            if filename:
+                pat= pat_key.search( name )
                 if pat:
                     result_text+= '- %s\n' % name
+                    found_files+= 1
+                    continue
+            if content:
+                with open( full_path, 'r', encoding='utf-8', errors='ignore' ) as fi:
+                    data= fi.read()
+                    pat= pat_key.search( data )
+                    if pat:
+                        result_text+= '- %s\n' % name
+                        found_files+= 1
+    if found_files == 0:
+        result_text= 'File not found\n\n'
     return  result_text
 
 @tool.add
-def search_in_files( pattern:str, case_sensitive:bool=True ) -> str:
-    """Searches the document and returns the filenames of the found files. Search patterns can use Python's regular expressions.
+def search_in_files( pattern:str, case_sensitive:bool=True, include_filenames:bool=False ) -> str:
+    """Searches documents and file contents and returns a list of filenames of found files. Search patterns can use Python's regular expressions.
 
     Args:
         pattern: Regular expressions
         case_sensitive: If false, case sensitivity is ignored. The default is true.
+        include_filenames: If true, include filenames.
     """
     flags= 0
     if not case_sensitive:
@@ -216,7 +230,7 @@ def search_in_files( pattern:str, case_sensitive:bool=True ) -> str:
     except re.PatternError as e:
         return  str(e)
     folder_root= os.environ.get( 'MCP_FOLDER_ROOT', '' )
-    return  grep_files( folder_root, pat_key )
+    return  grep_files( folder_root, pat_key, include_filenames, True )
 
 #------------------------------------------------------------------------------
 
