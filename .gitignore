@@ -14,3 +14,6 @@ list*.json
 log*.txt
 pytee.py
 *_cache.json
+*.output.*
+sample*.txt
+*.bak

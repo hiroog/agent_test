@@ -9,7 +9,7 @@ import sys
 # S model       qwen3:14b
 # I num_ctx     16384
 # F temperature 0.7
-# A tools       calc_add get_weather
+# SA tools      calc_add get_weather
 # ====T header
 # ～
 # ====T system_prompt
@@ -18,7 +18,7 @@ import sys
 # ～
 
 # S prset    assistant
-# A env      MCP_PROJECT_ROOT=c:/project MCP_ENGINE_ROOT=c:/engine
+# SA env     MCP_PROJECT_ROOT=c:/project MCP_ENGINE_ROOT=c:/engine
 # ====T system
 # ～
 # ====T prompt
@@ -40,6 +40,7 @@ class TextLoader:
         while index < line_count:
             line= lines[index]
             if line.startswith( ';;' ):
+                index+= 1
                 continue
             if line.startswith( '====' ):
                 return  text,index
@@ -47,7 +48,8 @@ class TextLoader:
             index+= 1
         return  text,index
 
-    def load_dict( self, lines, index, map_obj ):
+    def load_dict( self, lines, index, map_obj, dict_indent ):
+        dict_type= '=' * dict_indent
         line_count= len(lines)
         while index < line_count:
             line= lines[index].strip()
@@ -62,13 +64,18 @@ class TextLoader:
                 map_obj[params[1]]= int(params[2])
             elif param_type == 'F':
                 map_obj[params[1]]= float(params[2])
-            elif param_type == 'A':
+            elif param_type == 'A' or param_type == 'SA':
                 map_obj[params[1]]= params[2:]
             elif param_type == self.TYPE_TEXT:
                 text,index= self.load_text( lines, index+1 )
                 map_obj[params[1]]= text
                 continue
-            elif param_type == self.TYPE_DICT:
+            elif param_type == dict_type:
+                child_obj= {}
+                map_obj[params[1]]= child_obj
+                index= self.load_dict( lines, index+1, child_obj, dict_indent+2 )
+                continue
+            elif param_type.startswith( self.TYPE_DICT ) and len(param_type) < dict_indent:
                 return  index
             else:
                 print( 'dict "%s" format error (%d):' % (param_type,index), line )
@@ -81,26 +88,10 @@ class TextLoader:
         with open( file_name, 'r', encoding='utf-8' ) as fi:
             lines= fi.readlines()
         map_obj= {}
-        line_count= len(lines)
-        index= self.load_dict( lines, 0, map_obj )
-        while index < line_count:
-            line= lines[index].strip()
-            if line == '' or line.startswith( ';;' ):
-                index+= 1
-                continue
-            params= line.split()
-            param_type= params[0]
-            if param_type == self.TYPE_DICT:
-                prev_obj= {}
-                map_obj[params[1]]= prev_obj
-                index= self.load_dict( lines, index+1, prev_obj )
-                continue
-            else:
-                print( 'type "%s" error (%d):' % (param_type,index), line )
-            index+= 1
+        self.load_dict( lines, 0, map_obj, 8 )
         return  map_obj
 
-    def save_dict( self, fo, obj ):
+    def save_dict( self, fo, obj, dict_indent ):
         for key in obj:
             val= obj[key]
             if type(val) is str:
@@ -119,19 +110,20 @@ class TextLoader:
             val= obj[key]
             if type(val) is str:
                 if '\n' in val:
-                    fo.write( '====T %s\n' % key )
+                    fo.write( self.TYPE_TEXT + ' %s\n' % key )
                     fo.write( val )
                     if len(val) >= 1 and val[-1] != '\n':
                         fo.write( '\n' )
+        dict_type= '=' * dict_indent
         for key in obj:
             val= obj[key]
             if type(val) is dict:
-                fo.write( '======== %s\n' % key )
-                self.save_dict( fo, val )
+                fo.write( '%s %s\n' % (dict_type,key) )
+                self.save_dict( fo, val, dict_indent+2 )
 
     def save( self, file_name, obj ):
         with open( file_name, 'w', encoding='utf-8' ) as fo:
-            self.save_dict( fo, obj )
+            self.save_dict( fo, obj, 8 )
 
 #------------------------------------------------------------------------------
 
