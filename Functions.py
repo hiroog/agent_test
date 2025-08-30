@@ -99,45 +99,74 @@ def get_weather( city:str ) -> str:
 
 #------------------------------------------------------------------------------
 
-def find_file( folder, base_name_lower ):
+def find_file( folder, base_name ):
     for root,dirs,files in os.walk( folder ):
         for name in files:
-            if base_name_lower == name.lower():
+            if base_name == name.lower():
                 return  os.path.join( root, name )
     return  None
 
 def search_file( search_list, base_name ):
-    base_name_lower= base_name.lower()
+    base_name= base_name.lower()
     for dir_name in search_list:
-        result= find_file( dir_name, base_name_lower )
+        result= find_file( dir_name, base_name )
         if result:
             return  result
     return  base_name
+
+def find_path( folder, file_name ):
+    for root,dirs,files in os.walk( folder ):
+        for name in files:
+            full_path= os.path.join( root, name )
+            full_path_lower= full_path.replace( '\\', '/' ).lower()
+            if full_path_lower.endswith( file_name ):
+                return  full_path
+    return  None
+
+def search_path( folder_list, file_name ):
+    file_name= file_name.replace( '\\', '/' ).lower()
+    if os.path.isabs( file_name ):
+        found= False
+        for folder in folder_list:
+            folder= folder.replace( '\\', '/' ).lower()
+            if file_name.startswith( folder ):
+                found= True
+        if not found:
+            return  None
+    else:
+        file_name= '/'+file_name
+    for folder in folder_list:
+        result= find_path( folder, file_name )
+        if result:
+            return  result
+    return  None
 
 @tool.add
 def read_source_code( file_name:str ) -> str:
     """Read a source code.
     By simply specifying the file name, you can search the Project and Engine folders and read the file content.
     """
-    base_name= os.path.basename( file_name )
-    search_list= []
+    folder_list= []
     source_root= os.environ.get( 'MCP_SOURCE_ROOT', '' )
     if source_root != '':
-        search_list.append( os.path.abspath( source_root ) )
+        folder_list.append( os.path.abspath( source_root ) )
     project_root= os.environ.get( 'MCP_PROJECT_ROOT', '' )
     if project_root != '':
         project_root= os.path.abspath( project_root )
-        search_list.append( os.path.join( project_root, 'Source' ) )
-        search_list.append( os.path.join( project_root, 'Plugins' ) )
+        folder_list.append( os.path.join( project_root, 'Source' ) )
+        folder_list.append( os.path.join( project_root, 'Plugins' ) )
     engine_root= os.environ.get( 'MCP_ENGINE_ROOT', '' )
     if engine_root != '':
         engine_root= os.path.abspath( engine_root )
-        search_list.append( os.path.join( engine_root, 'Engine/Source' ) )
-        search_list.append( os.path.join( engine_root, 'Engine/Plugins' ) )
+        folder_list.append( os.path.join( engine_root, 'Engine/Source' ) )
+        folder_list.append( os.path.join( engine_root, 'Engine/Plugins' ) )
     ignore_set= set( ['.','..'] )
+    base_name= os.path.basename( file_name )
     if base_name in ignore_set:
         return  'Invalid filename "%s"' % file_name
-    full_name= search_file( search_list, base_name )
+    full_name= search_path( folder_list, file_name )
+    if full_name is None:
+        full_name= search_file( folder_list, base_name )
     print( 'load:', full_name, flush=True )
     if os.path.exists( full_name ):
         with open( full_name, 'r', encoding='utf-8' ) as fi:
@@ -193,13 +222,17 @@ def create_issue( title:str, description:str, file_name:str ) -> str:
 def grep_files( folder, pat_key, filename, content ):
     result_text= '**Found documents**:\n\n'
     found_files= 0
+    root_length= len(folder)+1
     for root,dirs,files in os.walk( folder ):
+        if '.git' in dirs:
+            dirs.remove( '.git' )
         for name in files:
             full_path= os.path.join( root, name )
+            relative_path= full_path[root_length:]
             if filename:
-                pat= pat_key.search( name )
+                pat= pat_key.search( relative_path )
                 if pat:
-                    result_text+= '- %s\n' % name
+                    result_text+= '- %s\n' % relative_path
                     found_files+= 1
                     continue
             if content:
@@ -207,7 +240,7 @@ def grep_files( folder, pat_key, filename, content ):
                     data= fi.read()
                     pat= pat_key.search( data )
                     if pat:
-                        result_text+= '- %s\n' % name
+                        result_text+= '- %s\n' % relative_path
                         found_files+= 1
     if found_files == 0:
         result_text= 'File not found\n\n'
@@ -215,7 +248,8 @@ def grep_files( folder, pat_key, filename, content ):
 
 @tool.add
 def search_in_files( pattern:str, case_sensitive:bool=True, include_filenames:bool=False ) -> str:
-    """Searches documents and file contents and returns a list of filenames of found files. Search patterns can use Python's regular expressions.
+    """Searches documents and file contents and returns a list of filenames of found files.
+    Search patterns can use Python's regular expressions.
 
     Args:
         pattern: Regular expressions
@@ -233,5 +267,109 @@ def search_in_files( pattern:str, case_sensitive:bool=True, include_filenames:bo
     return  grep_files( folder_root, pat_key, include_filenames, True )
 
 #------------------------------------------------------------------------------
+
+class LocalMemory:
+    def __init__( self ):
+        self.memory= []
+
+    def append( self, title, content ):
+        index= len(self.memory)
+        self.memory.append( (index,title,content) )
+        return  index
+
+    def get_memory( self, memory_id ):
+        if index >= 0 and index < len(self.memory) and self.memory[index] is not None:
+            return  self.memory[index]
+        return  -1,'Empty','Empty'
+
+    def remove( self, index ):
+        if index >= 0 and index < len(self.memory):
+            self.memory[index]= None
+
+local_memory= LocalMemory()
+
+@tool.add
+def add_note( title:str, content:str ) -> str:
+    """
+    Adds a note with the given title and content to retain critical information.
+    Used to preserve values, keywords, intermediate thoughts, or summaries
+    of past interactions as context grows.
+
+    Args:
+        title: Title of the note
+        content: Content of the note
+    """
+    global local_memory
+    note_id= local_memory.append( title, content )
+    return  'Added: ntoe_id=%d' % note_id
+
+@tool.add
+def get_note( ntoe_id:int ) -> str:
+    """
+    Retrieves a note by its unique ID.
+
+    Args:
+        note_id: Unique identifier assigned when the note was added.
+    """
+    global local_memory
+    _,title,content= local_memory.get_memory( note_id )
+    return  '# ' + title + '\n\n' + content + '\n'
+
+@tool.add
+def get_note_list() -> str:
+    """
+    Returns a list of note entries with their ids and titles.
+    """
+    result= '# Notes\n\n'
+    global local_memory
+    for note in local_memory.memory:
+        if note:
+            result+= '- %d : %s\n' % (note[0],note[1])
+    return  result
+
+@tool.add
+def delete_note( note_id:int ) -> str:
+    """
+    Deletes a note by its id.
+
+    Args:
+        note_id: The id of the note to be deleted.
+    """
+    global local_memory
+    local_memory.remove( note_id )
+    return  'Deleted: note_id=%d' % note_id
+
+#------------------------------------------------------------------------------
+
+class Controller():
+    def __init__( self ):
+        pass
+
+    def action( self, direction, action ):
+        pass
+
+controller= Controller()
+
+@tool.add
+def game_controller( movement_direction:str, game_action:str ) -> str:
+    """
+    Processes game input to control character movement and actions based on directional and action button inputs.
+
+    Args:
+        movement_direction (str): 
+            Directional input. Valid values: None, 'up', 'down', 'left', 'right'.  
+            Example: 'right' moves the character right; None means no movement.
+        game_action (str): 
+            Action button input. Valid values: None, 'A', 'B', 'X', 'Y'.  
+            Example: 'B' triggers a jump; None means no action.
+    """
+    global controller
+    if movement_direction not in [None,'up','down','left','right']:
+        return  'Invalid value for movement_direction'
+    if movement_direction not in [None,'A','B','X','Y']:
+        return  'Invalid value for game_action'
+    controller.action( direction, action )
+    return  'Movement and action inputs are valid'
+
 
 

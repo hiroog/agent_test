@@ -86,7 +86,7 @@ class OllamaOptions(OptionBase):
     def __init__( self, **args ):
         super().__init__()
         self.base_url= os.environ.get('OLLAMA_HOST', 'http://localhost:11434' )
-        self.provider= 'ollama2'
+        self.provider= 'ollama'    # or openai
         self.system_role= 'system' # or developer
         self.timeout= 600
         self.model= 'qwen3:8b'

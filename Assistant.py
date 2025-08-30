@@ -216,9 +216,11 @@ class Assistant:
             input_obj= None
             if self.options.input_file:
                 input_obj= self.load_file( self.options.input_file )
+                if input_obj is None:
+                    print( 'Input file not found:', self.options.input_file )
+                    return
             else:
-                print( 'Input file not found:', self.options.input_file )
-                return
+                input_obj= { 'prompt':'' }
             response,status_code,prompt= self.generate_chain( input_obj )
             if status_code != 200:
                 return
@@ -254,7 +256,7 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.27 Hiroyuki Ogasawara' )
+    print( 'Assistant v1.28 Hiroyuki Ogasawara' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )
@@ -270,7 +272,8 @@ def usage():
     print( '  --timeout <sec>             (default: 600)' )
     print( '  --print' )
     print( '  --debug' )
-    print( 'ex. python Assistant.py --input prompt.json --print' )
+    print( 'ex. python Assistant.py --input prompt.txt --print' )
+    print( 'ex. python Assistant.py --preset assistant --print' )
     sys.exit( 1 )
 
 

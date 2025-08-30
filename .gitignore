@@ -17,3 +17,4 @@ pytee.py
 *.output.*
 sample*.txt
 *.bak
+old
