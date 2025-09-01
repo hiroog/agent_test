@@ -187,6 +187,7 @@ class OllamaAPI:
             result= requests.post( api_url, headers=headers, data=data, timeout=self.options.timeout )
             request_time= time.perf_counter() - start_time
         except Exception as e:
+            print( str(e), flush=True )
             return  '',408
         if result.status_code == 200:
             data= result.json()

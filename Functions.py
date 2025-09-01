@@ -364,12 +364,14 @@ def game_controller( movement_direction:str, game_action:str ) -> str:
             Example: 'B' triggers a jump; None means no action.
     """
     global controller
-    if movement_direction not in [None,'up','down','left','right']:
+    if movement_direction not in [None,'None','up','down','left','right']:
         return  'Invalid value for movement_direction'
-    if movement_direction not in [None,'A','B','X','Y']:
+    if game_action not in [None,'None','A','B','X','Y']:
         return  'Invalid value for game_action'
-    controller.action( direction, action )
-    return  'Movement and action inputs are valid'
+    result= controller.action( movement_direction, game_action )
+    if result:
+        return  'Movement and action inputs are valid'
+    return  'Cannot move'
 
 
 
