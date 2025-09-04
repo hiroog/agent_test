@@ -46,6 +46,23 @@ class IssueList:
         self.logs.append( (self.issue_id,title,file_name,description) )
         return  self.issue_id
 
+issue_list= IssueList()
+
+@Functions.tool.add
+def create_issue( title:str, description:str, file_name:str ) -> str:
+    """Add a new issue to the bug tracking system.
+
+    Args:
+        title: Issue title
+        description: Issue description. Please include identifiable information such as file names and line numbers in the description along with the details of the issue.
+        file_name: Filename
+    """
+    global issue_list
+    issue_id= issue_list.append( title, file_name, description )
+    print( 'New Issue: %s (%s)' % (title,file_name) )
+    print( '  desc: %s' % title, flush=True )
+    return  'Issue created : "%s" id=%d' % (title,issue_id)
+
 #------------------------------------------------------------------------------
 
 class CodeAnalyzer:
@@ -215,13 +232,12 @@ class CodeAnalyzer:
         if self.options.debug:
             print( 'input:', input_obj )
 
+        global issue_list
         issue_list= IssueList()
-        Functions.issue_list= issue_list
 
         with ExecTime( 'Generate' ):
             response,status_code,prompt= self.assistant.generate_chain( input_obj )
 
-        Functions.issue_list= None
         if status_code != 200:
             return  False
 

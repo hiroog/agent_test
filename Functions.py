@@ -107,12 +107,44 @@ def find_file( folder, base_name ):
     return  None
 
 def search_file( search_list, base_name ):
-    base_name= base_name.lower()
+    base_name_low= base_name.lower()
     for dir_name in search_list:
-        result= find_file( dir_name, base_name )
+        result= find_file( dir_name, base_name_low )
         if result:
             return  result
     return  base_name
+
+@tool.add
+def read_source_code( file_name:str ) -> str:
+    """Read a source code.
+    By simply specifying the file name, you can search the Project and Engine folders and read the file content.
+    """
+    folder_list= []
+    source_root= os.environ.get( 'MCP_SOURCE_ROOT', '' )
+    if source_root != '':
+        folder_list.append( source_root )
+    project_root= os.environ.get( 'MCP_PROJECT_ROOT', '' )
+    if project_root != '':
+        folder_list.append( os.path.join( project_root, 'Source' ) )
+        folder_list.append( os.path.join( project_root, 'Plugins' ) )
+    engine_root= os.environ.get( 'MCP_ENGINE_ROOT', '' )
+    if engine_root != '':
+        folder_list.append( os.path.join( engine_root, 'Engine/Source' ) )
+        folder_list.append( os.path.join( engine_root, 'Engine/Plugins' ) )
+    ignore_set= set( ['.','..'] )
+    base_name= os.path.basename( file_name )
+    if base_name in ignore_set:
+        return  'Invalid filename "%s"' % file_name
+    full_name= search_file( folder_list, base_name )
+    print( 'load:', full_name, flush=True )
+    if os.path.exists( full_name ):
+        with open( full_name, 'r', encoding='utf-8' ) as fi:
+            code= fi.read()
+        return  ('** File: %s **\n\n' % base_name) + code
+    print( 'not found:', full_name, flush=True )
+    return  'File "%s" not found' % file_name
+
+#------------------------------------------------------------------------------
 
 def find_path( folder, file_name ):
     for root,dirs,files in os.walk( folder ):
@@ -130,9 +162,8 @@ def search_path( folder_list, file_name ):
         for folder in folder_list:
             folder= folder.replace( '\\', '/' ).lower()
             if file_name.startswith( folder ):
-                found= True
-        if not found:
-            return  None
+                return  file_name
+        return  None
     else:
         file_name= '/'+file_name
     for folder in folder_list:
@@ -142,7 +173,7 @@ def search_path( folder_list, file_name ):
     return  None
 
 @tool.add
-def read_source_code( file_name:str ) -> str:
+def read_source_code2( file_name:str ) -> str:
     """Read a source code.
     By simply specifying the file name, you can search the Project and Engine folders and read the file content.
     """
@@ -164,7 +195,9 @@ def read_source_code( file_name:str ) -> str:
     base_name= os.path.basename( file_name )
     if base_name in ignore_set:
         return  'Invalid filename "%s"' % file_name
-    full_name= search_path( folder_list, file_name )
+    if '..' in file_name:
+        return  'Invalid path "%s"' % file_name
+    full_name= search_path3( folder_list, file_name )
     if full_name is None:
         full_name= search_file( folder_list, base_name )
     print( 'load:', full_name, flush=True )
@@ -177,45 +210,63 @@ def read_source_code( file_name:str ) -> str:
 
 #------------------------------------------------------------------------------
 
-class LogFile:
-    def __init__( self, file_name ):
-        self.fp= None
-        self.file_name= file_name
-        self.issue_id= 0
-    def open( self ):
-        if self.fp is None:
-            self.fp= open( self.file_name, 'w', encoding='utf-8' )
-    def close( self ):
-        if self.fp:
-            self.fp.flush()
-            self.fp.close()
-            self.fp= None
-    def append( self, title, file_name, description ):
-        if self.fp is None:
-            self.open()
-        self.issue_id+= 1
-        entry= '%d,%s,%s\n%s\n\n' % (self.issue_id,title,file_name,description)
-        self.fp.write( entry + '\n' )
-        return  self.issue_id
+def find_path3( folder, file_name ):
+    for root,dirs,files in os.walk( folder ):
+        full_path= os.path.join( root, file_name )
+        if os.path.exists( full_path ):
+            return  full_path
+    return  None
 
-issue_list= None
+def search_path3( folder_list, file_name ):
+    file_name= file_name.replace( '\\', '/' ).lower()
+    if os.path.isabs( file_name ):
+        found= False
+        for folder in folder_list:
+            folder= folder.replace( '\\', '/' ).lower()
+            if file_name.startswith( folder ):
+                return  file_name
+        return  None
+    for folder in folder_list:
+        result= find_path3( folder, file_name )
+        if result:
+            return  result
+    return  None
 
 @tool.add
-def create_issue( title:str, description:str, file_name:str ) -> str:
-    """Add a new issue to the bug tracking system.
-
-    Args:
-        title: Issue title
-        description: Issue description. Please include identifiable information such as file names and line numbers in the description along with the details of the issue.
-        file_name: Filename
+def read_source_code3( file_name:str ) -> str:
+    """Read a source code.
+    By simply specifying the file name, you can search the Project and Engine folders and read the file content.
     """
-    global issue_list
-    issue_id= 0
-    if issue_list:
-        issue_id= issue_list.append( title, file_name, description )
-    print( 'New Issue: %s (%s)' % (title,file_name) )
-    print( '  desc: %s' % title, flush=True )
-    return  'Issue created : "%s" id=%d' % (title,issue_id)
+    folder_list= []
+    source_root= os.environ.get( 'MCP_SOURCE_ROOT', '' )
+    if source_root != '':
+        folder_list.append( os.path.abspath( source_root ) )
+    project_root= os.environ.get( 'MCP_PROJECT_ROOT', '' )
+    if project_root != '':
+        project_root= os.path.abspath( project_root )
+        folder_list.append( os.path.join( project_root, 'Source' ) )
+        folder_list.append( os.path.join( project_root, 'Plugins' ) )
+    engine_root= os.environ.get( 'MCP_ENGINE_ROOT', '' )
+    if engine_root != '':
+        engine_root= os.path.abspath( engine_root )
+        folder_list.append( os.path.join( engine_root, 'Engine/Source' ) )
+        folder_list.append( os.path.join( engine_root, 'Engine/Plugins' ) )
+    ignore_set= set( ['.','..'] )
+    base_name= os.path.basename( file_name )
+    if base_name in ignore_set:
+        return  'Invalid filename "%s"' % file_name
+    if '..' in file_name:
+        return  'Invalid path "%s"' % file_name
+    full_name= search_path( folder_list, file_name )
+    if full_name is None:
+        full_name= search_file( folder_list, base_name )
+    print( 'load:', full_name, flush=True )
+    if os.path.exists( full_name ):
+        with open( full_name, 'r', encoding='utf-8' ) as fi:
+            code= fi.read()
+        return  ('** File: %s **\n\n' % base_name) + code
+    print( 'not found:', full_name, flush=True )
+    return  'File "%s" not found' % file_name
 
 #------------------------------------------------------------------------------
 
@@ -340,38 +391,3 @@ def delete_note( note_id:int ) -> str:
     return  'Deleted: note_id=%d' % note_id
 
 #------------------------------------------------------------------------------
-
-class Controller():
-    def __init__( self ):
-        pass
-
-    def action( self, direction, action ):
-        pass
-
-controller= Controller()
-
-@tool.add
-def game_controller( movement_direction:str, game_action:str ) -> str:
-    """
-    Processes game input to control character movement and actions based on directional and action button inputs.
-
-    Args:
-        movement_direction (str): 
-            Directional input. Valid values: None, 'up', 'down', 'left', 'right'.  
-            Example: 'right' moves the character right; None means no movement.
-        game_action (str): 
-            Action button input. Valid values: None, 'A', 'B', 'X', 'Y'.  
-            Example: 'B' triggers a jump; None means no action.
-    """
-    global controller
-    if movement_direction not in [None,'None','up','down','left','right']:
-        return  'Invalid value for movement_direction'
-    if game_action not in [None,'None','A','B','X','Y']:
-        return  'Invalid value for game_action'
-    result= controller.action( movement_direction, game_action )
-    if result:
-        return  'Movement and action inputs are valid'
-    return  'Cannot move'
-
-
-
