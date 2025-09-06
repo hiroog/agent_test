@@ -33,6 +33,8 @@ class AnalyzerOption(OptionBase):
         self.cache_file= 'slack_cache.json'
         self.channel= None
         self.nossl= False
+        self.alias_file= None
+        self.use_mention= False
         #---------------------------
         self.apply_params( args )
 
@@ -312,12 +314,31 @@ class PostTool:
             print( 'SLACK_API_TOKEN not found in environment variables.' )
             return
         self.api= SlackAPI.SlackAPI( token, self.options.cache_file, self.options.nossl )
+        self.alias= None
 
     def post_message( self, channel_name, text, blocks=None, markdown_text=None, parent_response= None ):
         thread_ts= None
         if parent_response:
             thread_ts= parent_response.get('ts', None)
         return  self.api.post_message( channel_name, text, blocks, markdown_text, thread_ts )
+
+    def load_json( self, file_name ):
+        if os.path.exists( file_name ):
+            print( 'load:', file_name )
+            with open( file_name, 'r', encoding='utf-8' ) as fi:
+                return  json.loads( fi.read() )
+
+    def user_alias( self, user_list ):
+        user_list= ['@'+user for user in user_list]
+        if self.alias is None:
+            self.alias= self.load_json( self.options.alias_file )
+        if self.alias:
+            result_list= []
+            for user in user_list:
+                result_list.append( '<'+self.alias.get( user, user )+'>' )
+            return  result_list
+        user_list= ['<'+user+'>' for user in user_list]
+        return  user_list
 
     def post_1( self, log_file_name ):
         analyzed_obj= TextLoader.TextLoader().load( log_file_name )
@@ -331,10 +352,14 @@ class PostTool:
             print( 'skip: %s' % file_name_full )
             return
 
-        user_list= default_obj.get( 'users', [] )
-        user_menthon= ' '.join( ['@'+user for user in user_list] )
+        user_menthon= ''
+        if self.options.use_mention:
+            user_list= default_obj.get( 'users', [] )
+            user_list= self.user_alias( user_list )
+            print( 'USER',user_list, flush=True )
+            user_menthon= ' '.join( user_list ) + '\n'
 
-        text= user_menthon + '\n'
+        text= user_menthon
         text+= '*Code review*\n'
         text+= '%s\n' % base_file_name
         text+= 'Issues: %d\n\n' % issue_count
@@ -359,6 +384,7 @@ class PostTool:
                 },
             },
         ]
+        print( 'BLOCK', blocks )
         response= self.post_message( self.options.channel, text=text, blocks=blocks )
 
         for issue_id in range(1,issue_count+1):
@@ -384,21 +410,22 @@ class PostTool:
         response= self.post_message( self.options.channel, text=None, blocks=None, markdown_text=text, parent_response=response )
 
     def post_all( self ):
-        with os.scandir( self.options.log_dir ) as di:
-            for entry in di:
-                if entry.name.startswith( '.' ) or not entry.is_file():
-                    continue
-                _,ext= os.path.splitext( entry.name )
-                if ext == '.txt':
-                    full_path= os.path.join( self.options.log_dir, entry.name )
-                    self.post_1( full_path )
-        self.api.save_cache()
+        if os.path.exists( self.options.log_dir ):
+            with os.scandir( self.options.log_dir ) as di:
+                for entry in di:
+                    if entry.name.startswith( '.' ) or not entry.is_file():
+                        continue
+                    _,ext= os.path.splitext( entry.name )
+                    if ext == '.txt':
+                        full_path= os.path.join( self.options.log_dir, entry.name )
+                        self.post_1( full_path )
+            self.api.save_cache()
 
 
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.15 Hiroyuki Ogasawara' )
+    print( 'CodeAnalyzer v1.16 Hiroyuki Ogasawara' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )
@@ -409,6 +436,8 @@ def usage():
     print( '  --preset <preset_name>      default cppreview' )
     print( '  --prompt_dir <prompt_dir>   default .' )
     print( '  --config <config.txt>       default config.txt' )
+    print( '  --user_alias <alias_json>   default None' )
+    print( '  --use_mention' )
     print( '  --save_list' )
     print( '  --load_list' )
     print( '  --clar_logdir' )
@@ -448,6 +477,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'config_file' )
             elif arg == '--preset':
                 ai= options.set_str( ai, argv, 'preset' )
+            elif arg == '--user_alias':
+                ai= options.set_str( ai, argv, 'alias_file' )
             elif arg == '--post':
                 ai= options.set_str( ai, argv, 'channel' )
                 func_list.append( 'f_post' )
@@ -461,6 +492,8 @@ def main( argv ):
                 func_list.append( 'f_analyze' )
             elif arg == '--nossl':
                 options.nossl= True
+            elif arg == '--use_mention':
+                options.use_mention= True
             elif arg == '--debug':
                 options.debug= True
             else:
