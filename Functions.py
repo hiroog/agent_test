@@ -196,7 +196,7 @@ def read_source_code3( file_name:str ) -> str:
         return  'Invalid filename "%s"' % file_name
     if '..' in file_name:
         return  'Invalid path "%s"' % file_name
-    full_name= search_path( folder_list, file_name )
+    full_name= search_path3( folder_list, file_name )
     if full_name is None:
         full_name= search_file( folder_list, base_name )
     print( 'load:', full_name, flush=True )

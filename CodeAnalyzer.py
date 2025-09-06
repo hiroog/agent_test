@@ -26,6 +26,7 @@ class AnalyzerOption(OptionBase):
         self.list_file= 'list.txt'
         self.log_dir= 'logs'
         self.preset= 'cppreview'
+        self.config_file= None
         self.prompt_dir= '.'
         self.debug= False
         #---------------------------
@@ -71,7 +72,7 @@ class CodeAnalyzer:
         self.file_list= None
         self.file_map= {}
         self.uemode= options.project is not None
-        options= Assistant.AssistantOptions( prompt_dir=options.prompt_dir )
+        options= Assistant.AssistantOptions( prompt_dir=options.prompt_dir, config_file=options.config_file )
         if self.options.debug:
             options.print= True
             options.debug_echo= True
@@ -397,7 +398,7 @@ class PostTool:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.14 Hiroyuki Ogasawara' )
+    print( 'CodeAnalyzer v1.15 Hiroyuki Ogasawara' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )
@@ -407,6 +408,7 @@ def usage():
     print( '  --log_dir <output_folder>   default logs' )
     print( '  --preset <preset_name>      default cppreview' )
     print( '  --prompt_dir <prompt_dir>   default .' )
+    print( '  --config <config.txt>       default config.txt' )
     print( '  --save_list' )
     print( '  --load_list' )
     print( '  --clar_logdir' )
@@ -442,6 +444,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'log_dir' )
             elif arg == '--prompt_dir':
                 ai= options.set_str( ai, argv, 'prompt_dir' )
+            elif arg == '--config':
+                ai= options.set_str( ai, argv, 'config_file' )
             elif arg == '--preset':
                 ai= options.set_str( ai, argv, 'preset' )
             elif arg == '--post':
