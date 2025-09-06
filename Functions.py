@@ -5,6 +5,7 @@ import os
 import inspect
 import random
 import re
+import time
 
 #------------------------------------------------------------------------------
 
@@ -94,7 +95,7 @@ def calc_add( a: int, b: int ) -> int:
 
 @tool.add
 def get_weather( city:str ) -> str:
-    """Get weather"""
+    """Get the weather"""
     return  ['晴れ','雨','雷雨','曇り','雪','曇のち晴れ'][random.randrange(0,6)]
 
 #------------------------------------------------------------------------------
@@ -116,13 +117,14 @@ def search_file( search_list, base_name ):
 
 @tool.add
 def read_source_code( file_name:str ) -> str:
-    """Read a source code.
+    """
+    Read a source code.
     By simply specifying the file name, you can search the Project and Engine folders and read the file content.
     """
     folder_list= []
-    source_root= os.environ.get( 'MCP_SOURCE_ROOT', '' )
-    if source_root != '':
-        folder_list.append( source_root )
+    folder_root= os.environ.get( 'MCP_FOLDER_ROOT', os.environ.get( 'MCP_SOURCE_ROOT', '' ) )
+    if folder_root != '':
+        folder_list.append( folder_root )
     project_root= os.environ.get( 'MCP_PROJECT_ROOT', '' )
     if project_root != '':
         folder_list.append( os.path.join( project_root, 'Source' ) )
@@ -136,70 +138,6 @@ def read_source_code( file_name:str ) -> str:
     if base_name in ignore_set:
         return  'Invalid filename "%s"' % file_name
     full_name= search_file( folder_list, base_name )
-    print( 'load:', full_name, flush=True )
-    if os.path.exists( full_name ):
-        with open( full_name, 'r', encoding='utf-8' ) as fi:
-            code= fi.read()
-        return  ('** File: %s **\n\n' % base_name) + code
-    print( 'not found:', full_name, flush=True )
-    return  'File "%s" not found' % file_name
-
-#------------------------------------------------------------------------------
-
-def find_path( folder, file_name ):
-    for root,dirs,files in os.walk( folder ):
-        for name in files:
-            full_path= os.path.join( root, name )
-            full_path_lower= full_path.replace( '\\', '/' ).lower()
-            if full_path_lower.endswith( file_name ):
-                return  full_path
-    return  None
-
-def search_path( folder_list, file_name ):
-    file_name= file_name.replace( '\\', '/' ).lower()
-    if os.path.isabs( file_name ):
-        found= False
-        for folder in folder_list:
-            folder= folder.replace( '\\', '/' ).lower()
-            if file_name.startswith( folder ):
-                return  file_name
-        return  None
-    else:
-        file_name= '/'+file_name
-    for folder in folder_list:
-        result= find_path( folder, file_name )
-        if result:
-            return  result
-    return  None
-
-@tool.add
-def read_source_code2( file_name:str ) -> str:
-    """Read a source code.
-    By simply specifying the file name, you can search the Project and Engine folders and read the file content.
-    """
-    folder_list= []
-    source_root= os.environ.get( 'MCP_SOURCE_ROOT', '' )
-    if source_root != '':
-        folder_list.append( os.path.abspath( source_root ) )
-    project_root= os.environ.get( 'MCP_PROJECT_ROOT', '' )
-    if project_root != '':
-        project_root= os.path.abspath( project_root )
-        folder_list.append( os.path.join( project_root, 'Source' ) )
-        folder_list.append( os.path.join( project_root, 'Plugins' ) )
-    engine_root= os.environ.get( 'MCP_ENGINE_ROOT', '' )
-    if engine_root != '':
-        engine_root= os.path.abspath( engine_root )
-        folder_list.append( os.path.join( engine_root, 'Engine/Source' ) )
-        folder_list.append( os.path.join( engine_root, 'Engine/Plugins' ) )
-    ignore_set= set( ['.','..'] )
-    base_name= os.path.basename( file_name )
-    if base_name in ignore_set:
-        return  'Invalid filename "%s"' % file_name
-    if '..' in file_name:
-        return  'Invalid path "%s"' % file_name
-    full_name= search_path3( folder_list, file_name )
-    if full_name is None:
-        full_name= search_file( folder_list, base_name )
     print( 'load:', full_name, flush=True )
     if os.path.exists( full_name ):
         with open( full_name, 'r', encoding='utf-8' ) as fi:
@@ -234,13 +172,14 @@ def search_path3( folder_list, file_name ):
 
 @tool.add
 def read_source_code3( file_name:str ) -> str:
-    """Read a source code.
-    By simply specifying the file name, you can search the Project and Engine folders and read the file content.
+    """
+    Read a source code.
+    By simply specifying a partial path or filename, you can search the folders and read the file content.
     """
     folder_list= []
-    source_root= os.environ.get( 'MCP_SOURCE_ROOT', '' )
-    if source_root != '':
-        folder_list.append( os.path.abspath( source_root ) )
+    folder_root= os.environ.get( 'MCP_FOLDER_ROOT', os.environ.get( 'MCP_SOURCE_ROOT', '' ) )
+    if folder_root != '':
+        folder_list.append( os.path.abspath( folder_root ) )
     project_root= os.environ.get( 'MCP_PROJECT_ROOT', '' )
     if project_root != '':
         project_root= os.path.abspath( project_root )
@@ -275,8 +214,10 @@ def grep_files( folder, pat_key, filename, content ):
     found_files= 0
     root_length= len(folder)+1
     for root,dirs,files in os.walk( folder ):
-        if '.git' in dirs:
-            dirs.remove( '.git' )
+        if '.git' in root:
+            continue
+        if '__pycache__' in root:
+            continue
         for name in files:
             full_path= os.path.join( root, name )
             relative_path= full_path[root_length:]
@@ -299,7 +240,8 @@ def grep_files( folder, pat_key, filename, content ):
 
 @tool.add
 def search_in_files( pattern:str, case_sensitive:bool=True, include_filenames:bool=False ) -> str:
-    """Searches documents and file contents and returns a list of filenames of found files.
+    """
+    Searches documents and file contents and returns a list of filenames of found files.
     Search patterns can use Python's regular expressions.
 
     Args:
@@ -312,10 +254,19 @@ def search_in_files( pattern:str, case_sensitive:bool=True, include_filenames:bo
         flags|= re.IGNORECASE
     try:
         pat_key= re.compile( pattern, flags )
-    except re.PatternError as e:
+    except re.error as e:
         return  str(e)
     folder_root= os.environ.get( 'MCP_FOLDER_ROOT', '' )
     return  grep_files( folder_root, pat_key, include_filenames, True )
+
+#------------------------------------------------------------------------------
+
+@tool.add
+def get_current_datetime() -> str:
+    """
+    Returns the current date and time in the format YYYY-MM-DD HH:MM:SS."
+    """
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 #------------------------------------------------------------------------------
 

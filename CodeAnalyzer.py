@@ -397,7 +397,7 @@ class PostTool:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.13 Hiroyuki Ogasawara' )
+    print( 'CodeAnalyzer v1.14 Hiroyuki Ogasawara' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )
