@@ -418,17 +418,19 @@ class PostTool:
             return
 
         user_menthon= ''
+        user_list= default_obj.get( 'users', [] )
         if self.options.use_mention:
-            user_list= default_obj.get( 'users', [] )
-            user_list= self.user_alias( user_list )
-            print( 'USER',user_list, flush=True )
-            user_menthon= ' '.join( user_list )
+            slack_user_list= self.user_alias( user_list )
+            print( 'USER',slack_user_list, flush=True )
+            user_menthon= ' '.join( slack_user_list )
+
 
         text_title= '*%s*  (%d)\n' % (base_file_name,issue_count)
 
-        body= ''
+        body= '\n'
         if base_file_name != file_name_full:
-            body+= '\n- %s\n' % file_name_full
+            body+= '- %s\n' % file_name_full
+        body+= '- %s\n' % ' '.join( user_list )
         body+= '\n'
         for issue_id in range(1,issue_count+1):
             obj= {}
@@ -452,7 +454,6 @@ class PostTool:
                 },
             },
         ]
-        print( 'BLOCK', blocks )
         response= self.post_message( self.options.channel, text=text, blocks=blocks )
 
         for issue_id in range(1,issue_count+1):
@@ -494,7 +495,7 @@ class PostTool:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.20 Hiroyuki Ogasawara' )
+    print( 'CodeAnalyzer v1.21 Hiroyuki Ogasawara' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )
