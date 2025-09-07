@@ -29,6 +29,7 @@ class AnalyzerOption(OptionBase):
         self.config_file= None
         self.prompt_dir= '.'
         self.debug= False
+        self.limit= 0
         #---------------------------
         self.cache_file= 'slack_cache.json'
         self.channel= None
@@ -79,6 +80,10 @@ class CodeAnalyzer:
             options.print= True
             options.debug_echo= True
         self.assistant= Assistant.Assistant( options )
+        self.stat_analyzed_files= []
+        self.stat_issue_files= []
+        self.stat_total_issues= 0
+        self.stat_analyze_time= ExecTime().get_date()
 
     #--------------------------------------------------------------------------
 
@@ -120,6 +125,10 @@ class CodeAnalyzer:
             file_list.append( file_name )
             file_map[file_name]= entry
         return  file_list,file_map
+
+    def save_json( self, save_name, obj ):
+        with open( save_name, 'w', encoding='utf-8' ) as fo:
+            fo.write( json.dumps( obj, indent=4 ) )
 
     #--------------------------------------------------------------------------
 
@@ -185,15 +194,20 @@ class CodeAnalyzer:
 
     def save_logs( self, response, prompt, file_list, issue_list ):
         log_obj= {}
+        issue_count= len(issue_list.logs)
         default_obj= {
             'response': response,
             'file_name': file_list[0],
             'sources': file_list,
-            'issue_count': len(issue_list.logs),
+            'issue_count': issue_count,
         }
         user_list= []
         self.set_file_info( default_obj, file_list[0], user_list )
         log_obj['default']= default_obj
+
+        if issue_count != 0:
+            self.stat_issue_files.append( file_list[0] )
+            self.stat_total_issues+= issue_count
 
         for issue in issue_list.logs:
             issue_id= issue[0]
@@ -250,7 +264,6 @@ class CodeAnalyzer:
     def analyze( self, file_list ):
         with ExecTime( 'Analyze' ):
             file_set= set(file_list)
-            analyze_count= 0
             for file_name in file_list:
                 base,ext= os.path.splitext( file_name )
                 if ext == '.cpp':
@@ -260,8 +273,23 @@ class CodeAnalyzer:
                         analyze_list.append( header_file )
                     if not self.analyze_1( analyze_list ):
                         break
-                    analyze_count+= 1
-            print( 'Analyze: %d files' % analyze_count )
+                    self.stat_analyzed_files.append( file_name )
+                    if self.options.limit != 0:
+                        if len(self.stat_analyzed_files) >= self.options.limit:
+                            print( '%d limit reached' % self.options.limit )
+                            break
+        analyzed_count= len(self.stat_analyzed_files)
+        issue_file_count= len(self.stat_issue_files)
+        print( 'Analyzed: %d files' % analyzed_count )
+        print( 'Issues: %d (%d files)' % (self.stat_total_issues,issue_file_count), flush=True )
+        result_file_name= 'analyzer_stat.json'
+        self.save_json( result_file_name, {
+                'analyzed_count': analyzed_count,
+                'issue_file_count': issue_file_count,
+                'total_issues': self.stat_total_issues,
+                'time': self.stat_analyze_time,
+                'root': self.options.project if self.options.project else self.options.root
+            })
         if self.options.debug:
             self.assistant.stat_dump()
 
@@ -327,6 +355,7 @@ class PostTool:
             print( 'load:', file_name )
             with open( file_name, 'r', encoding='utf-8' ) as fi:
                 return  json.loads( fi.read() )
+        return  None
 
     def user_alias( self, user_list ):
         user_list= ['@'+user for user in user_list]
@@ -339,6 +368,42 @@ class PostTool:
             return  result_list
         user_list= ['<'+user+'>' for user in user_list]
         return  user_list
+
+    def post_info( self ):
+        result= self.load_json( 'analyzer_stat.json' )
+        if result is None:
+            return
+        issue_count= result.get('total_issues',0)
+        if issue_count != 0:
+            text_title= '🟥 AI Review: %s' % result.get('time','')
+        else:
+            text_title= '🟦 AI Review: %s' % result.get('time','')
+        text= ''
+        text+= '*root*: %s\n' % result.get('root','')
+        text+= '*analyzed*: %d files\n' % result.get('analyzed_count',0)
+        text+= '*issues*: %d (%d files)\n' % (issue_count,result.get('issue_file_count',0))
+        blocks= [
+            {
+                'type': 'header',
+                'text': {
+                    'type': 'plain_text',
+                    'text': text_title,
+                    'emoji': True,
+                },
+            },
+            {
+                'type': 'divider'
+            },
+            {
+                'type': 'section',
+                'expand': True,
+                'text': {
+                    'type': 'mrkdwn',
+                    'text': text,
+                },
+            },
+        ]
+        self.post_message( self.options.channel, text=text_title+'\n'+text, blocks=blocks )
 
     def post_1( self, log_file_name ):
         analyzed_obj= TextLoader.TextLoader().load( log_file_name )
@@ -357,12 +422,14 @@ class PostTool:
             user_list= default_obj.get( 'users', [] )
             user_list= self.user_alias( user_list )
             print( 'USER',user_list, flush=True )
-            user_menthon= ' '.join( user_list ) + '\n'
+            user_menthon= ' '.join( user_list )
 
-        text= user_menthon
-        text+= '*Code review*\n'
-        text+= '%s\n' % base_file_name
-        text+= 'Issues: %d\n\n' % issue_count
+        text_title= '*%s*  (%d)\n' % (base_file_name,issue_count)
+
+        body= ''
+        if base_file_name != file_name_full:
+            body+= '\n- %s\n' % file_name_full
+        body+= '\n'
         for issue_id in range(1,issue_count+1):
             obj= {}
             key= 'issue_%d' % issue_id
@@ -371,9 +438,10 @@ class PostTool:
             title= obj.get( 'title', '' )
             file_name= obj.get( 'file_name', '' )
             if file_name != base_file_name:
-                text+= '%d. %s (%s)\n' % (issue_id,title,file_name)
+                body+= '%d. %s (%s)\n' % (issue_id,title,file_name)
             else:
-                text+= '%d. %s\n' % (issue_id,title)
+                body+= '%d. %s\n' % (issue_id,title)
+        text= user_menthon + '\n' + text_title + body
         blocks= [
             {
                 'type': 'section',
@@ -411,6 +479,7 @@ class PostTool:
 
     def post_all( self ):
         if os.path.exists( self.options.log_dir ):
+            self.post_info()
             with os.scandir( self.options.log_dir ) as di:
                 for entry in di:
                     if entry.name.startswith( '.' ) or not entry.is_file():
@@ -425,7 +494,7 @@ class PostTool:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.16 Hiroyuki Ogasawara' )
+    print( 'CodeAnalyzer v1.20 Hiroyuki Ogasawara' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )
@@ -437,10 +506,11 @@ def usage():
     print( '  --prompt_dir <prompt_dir>   default .' )
     print( '  --config <config.txt>       default config.txt' )
     print( '  --user_alias <alias_json>   default None' )
+    print( '  --limit <max_sources>       default 0' )
     print( '  --use_mention' )
     print( '  --save_list' )
     print( '  --load_list' )
-    print( '  --clar_logdir' )
+    print( '  --clear' )
     print( '  --analyze' )
     print( '  --post <channel>' )
     print( '  --nossl' )
@@ -479,10 +549,12 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'preset' )
             elif arg == '--user_alias':
                 ai= options.set_str( ai, argv, 'alias_file' )
+            elif arg == '--limit':
+                ai= options.set_int( ai, argv, 'limit' )
             elif arg == '--post':
                 ai= options.set_str( ai, argv, 'channel' )
                 func_list.append( 'f_post' )
-            elif arg == '--clear_logdir':
+            elif arg == '--clear_logdir' or arg == '--clear':
                 func_list.append( 'f_clear_logdir' )
             elif arg == '--save_list':
                 func_list.append( 'f_save_list' )
