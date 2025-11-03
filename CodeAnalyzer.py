@@ -26,7 +26,7 @@ class AnalyzerOption(OptionBase):
         self.list_file= 'list.txt'
         self.log_dir= 'logs'
         self.preset= 'cppreview'
-        self.config_file= None
+        self.config_file= 'config.txt'
         self.prompt_dir= '.'
         self.debug= False
         self.limit= 0
