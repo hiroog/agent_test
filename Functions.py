@@ -256,7 +256,8 @@ def search_in_files( pattern:str, case_sensitive:bool=True, include_filenames:bo
         pat_key= re.compile( pattern, flags )
     except re.error as e:
         return  str(e)
-    folder_root= os.environ.get( 'MCP_FOLDER_ROOT', '' )
+    #folder_root= os.environ.get( 'MCP_FOLDER_ROOT', '' )
+    folder_root= os.environ.get( 'MCP_FOLDER_ROOT', os.environ.get( 'MCP_SOURCE_ROOT', '' ) )
     return  grep_files( folder_root, pat_key, include_filenames, True )
 
 #------------------------------------------------------------------------------

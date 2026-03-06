@@ -75,7 +75,7 @@ class CodeAnalyzer:
         self.file_list= None
         self.file_map= {}
         self.uemode= options.project is not None
-        options= Assistant.AssistantOptions( prompt_dir=options.prompt_dir, config_file=options.config_file )
+        options= Assistant.AssistantOptions( prompt_dir=options.prompt_dir, config_file=options.config_file, timeout=60*20 )
         if self.options.debug:
             options.print= True
             options.debug_echo= True
