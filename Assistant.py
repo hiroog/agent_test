@@ -99,6 +99,7 @@ class AssistantOptions(OllamaAPI4.OllamaOptions):
         self.prompt_dir= '.'
         self.env= []
         self.apply_params( args )
+        self.chat_mode= False
 
 #------------------------------------------------------------------------------
 
@@ -158,23 +159,26 @@ class Assistant:
 
     #--------------------------------------------------------------------------
 
-    def generate_text( self, input_obj, preset_name= None ):
+    def generate_text( self, input_obj, preset_name= None, message_list= None ):
+        if message_list is None:
+            message_list= []
         if preset_name is None:
             preset_name= input_obj.get( 'preset', self.options.preset )
         preset_prompt,preset_system,preset_header= self.load_preset( preset_name )
         prompt= input_obj['prompt']
-        if preset_prompt:
-            prompt= preset_prompt + '\n' + prompt
         system= input_obj.get( 'system', None )
-        if preset_system and system:
-            system+= preset_system + '\n' + system
+        if message_list == []:
+            if preset_prompt:
+                prompt= preset_prompt + '\n' + prompt
+            if preset_system and system:
+                system+= preset_system + '\n' + system
         if 'model' in input_obj:
             self.options.model= input_obj['model']
         self.set_env( self.options.env )
         if 'env' in input_obj:
             self.set_env( input_obj['env'] )
         header_text= input_obj.get( 'header', preset_header )
-        response,status_code= self.ollama_api.generate( prompt, system )
+        response,status_code= self.ollama_api.generate( prompt, system, None, message_list )
         if status_code != 200:
             print( 'Generate Error: %d' % status_code, flush=True )
             return  response,status_code,prompt
@@ -256,7 +260,7 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.28 Hiroyuki Ogasawara' )
+    print( 'Assistant v1.30 Hiroyuki Ogasawara' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )

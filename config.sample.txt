@@ -1,6 +1,7 @@
 ;; vim:ts=4 sw=4 et:
 
-S base_url  http://localhost:11434
+S base_url  http://localhost:1234
+S provider  openai
 
 
 ======== default
@@ -10,32 +11,36 @@ A tools
 
 ======== test01
 
-S model     qwen3:8b
+S model     google/gemma-4-e2b
 I num_ctx   2048
 A tools	    calc_add
 
 
-======== test01-lm
+======== test01-ollama
 
-S model     openai/gpt-oss-20b
+S model     gpt-oss:20b
 I num_ctx   2048
+S base_url  http://localhost:11434
+S provider  ollama
 A tools	    calc_add
-S base_url  http://localhost:1234
-S provider  lmstudio
 
 
 ======== test02
 
-S model     qwen3:8b
+S model     qwen/qwen3.5-9b
 I num_ctx   2048
 A tools	    get_weather
 
 
 ======== assistant1
 
-S model     qwen3:14b
+S model     qwen/qwen3.5-9b
 I num_ctx   16384
 A tools	    read_source_code
+F temperature 0.6
+F min_p	    0.01
+F top_p	    0.95
+I top_k	    20
 
 
 ====T header
@@ -44,5 +49,19 @@ A tools	    read_source_code
 
 以下のエラーを日本語で解説してください。
 C++のエラーの場合はToolを使ってソースコードやヘッダファイルを参照しながら解説してください。
+
+
+
+======== chatbot
+
+S model     google/gemma-4-e4b
+I num_ctx   16384
+A tools
+
+
+====T base_prompt
+
+あなたの名前は「太郎」です。
+アシスタントとして会話してください。
 
 

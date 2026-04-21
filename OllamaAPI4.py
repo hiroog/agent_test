@@ -204,9 +204,10 @@ class OllamaAPI:
             print( 'Error: %d' % result.status_code, flush=True )
         return  None,result.status_code
 
-    def chat_oai( self, text, system= None, image_data= None ):
+    def chat_oai( self, text, system= None, image_data= None, message_list= None ):
         tools= self.options.tools
-        message_list= []
+        if message_list is None:
+            message_list= []
         message= {
                     'role': 'user',
                     'content': text,
@@ -432,9 +433,10 @@ class OllamaAPI:
             print( 'Error: %d' % result.status_code, flush=True )
         return  None,result.status_code
 
-    def generate_ollama_chat( self, text, system= None, image_data= None ):
+    def generate_ollama_chat( self, text, system= None, image_data= None, message_list= None ):
         tools= self.options.tools
-        message_list= []
+        if message_list is None:
+            message_list= []
         message= {
                     'role': 'user',
                     'content': text,
@@ -484,11 +486,11 @@ class OllamaAPI:
 
     #--------------------------------------------------------------------------
 
-    def generate( self, text, system= None, image_data= None ):
+    def generate( self, text, system= None, image_data= None, message_list= None ):
         if self.options.provider.startswith( 'ollama' ):
-            return  self.generate_ollama_chat( text, system, image_data )
+            return  self.generate_ollama_chat( text, system, image_data, message_list )
         elif self.options.provider == 'lmstudio' or self.options.provider == 'openai':
-            return  self.chat_oai( text, system, image_data )
+            return  self.chat_oai( text, system, image_data, message_list )
         return  '',400
 
     #--------------------------------------------------------------------------
@@ -503,7 +505,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.28 Hiroyuki Ogasawara' )
+    print( 'OllamaAPI v4.30 Hiroyuki Ogasawara' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )
