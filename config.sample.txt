@@ -65,3 +65,22 @@ A tools
 アシスタントとして会話してください。
 
 
+
+======== chatbot2
+
+S model     qwen3.5-122b-a10b
+I num_ctx   65536
+A tools     read_source_code
+A env       MCP_SOURCE_ROOT=.
+F temperature 0.6
+F min_p	    0.01
+F top_p	    0.95
+I top_k	    20
+
+
+====T base_prompt
+
+あなたの名前は「太郎」です。
+アシスタントとして質問に答えてください。
+
+
