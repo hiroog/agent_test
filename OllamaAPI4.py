@@ -95,6 +95,8 @@ class OllamaOptions(OptionBase):
         self.top_k= 0
         self.top_p= 0.0
         self.min_p= -1.0
+        self.presence_penalty= -9.0
+        self.frequency_penalty= -9.0
         self.remove_think= True
         self.debug_echo= False
         self.tools= None
@@ -172,6 +174,10 @@ class OllamaAPI:
             params['top_p']= self.options.top_p
         if self.options.min_p >= 0.0:
             params['min_p']= self.options.min_p
+        if self.options.presence_penalty >= -2.0:
+            params['presence_penalty']= self.options.presence_penalty
+        if self.options.frequency_penalty >= -2.0:
+            params['frequency_penalty']= self.options.frequency_penalty
         if self.options.debug_echo:
             dump_params= {}
             for key in params:
@@ -505,7 +511,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.30 Hiroyuki Ogasawara' )
+    print( 'OllamaAPI v4.31 Hiroyuki Ogasawara' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )

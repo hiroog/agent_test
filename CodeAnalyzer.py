@@ -472,11 +472,11 @@ class PostTool:
                 text+= '更新日: %s\n\n' % date
             text+= '## 内容\n\n'
             text+= description + '\n\n　\n'
-            response= self.post_message( self.options.channel, text=None, blocks=None, markdown_text=text, parent_response=response )
+            response= self.post_message( self.options.channel, text=text, blocks=[{'type':'markdown','text':text}], markdown_text=None, parent_response=response )
 
         text= '# 🔵 %s\n\n' % file_name
         text+= '%s\n\n' % default_obj.get('response','')
-        response= self.post_message( self.options.channel, text=None, blocks=None, markdown_text=text, parent_response=response )
+        response= self.post_message( self.options.channel, text=text, blocks=[{'type':'markdown','text':text}], markdown_text=None, parent_response=response )
 
     def post_all( self ):
         if os.path.exists( self.options.log_dir ):

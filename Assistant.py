@@ -4,6 +4,7 @@
 import sys
 import os
 import json
+import importlib
 
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
@@ -39,7 +40,10 @@ import TextLoader
 # I top_k       20                      option
 # F top_p       1.0                     option
 # F min_p       0.0                     option
+# F presence_penalty  0.0               option
+# F frequency_penalty 1.0               option
 # A env envname=envvalue ～             option
+# A inline_mcp  FileTools Memory        option
 # ======== preset-name1
 # S base_url    http://localhost:11434  option
 # S provider    provider                option
@@ -112,6 +116,13 @@ class Assistant:
         self.load_preset( options.preset )
         self.set_env( self.options.env )
         self.ollama_api= OllamaAPI4.OllamaAPI( options )
+        self.import_inline_modules()
+
+    #--------------------------------------------------------------------------
+
+    def import_inline_modules( self ):
+        for mcp_module in self.config.get( 'inline_mcp', [] ):
+            importlib.import_module( mcp_module )
 
     #--------------------------------------------------------------------------
     def load_json( self, file_name ):
@@ -140,7 +151,7 @@ class Assistant:
 
     def load_preset( self, preset_name ):
         if self.config:
-            merge_key_list= [ 'base_url', 'provider', 'model', 'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'env' ]
+            merge_key_list= [ 'base_url', 'provider', 'model', 'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'presence_penalty', 'frequency_penalty', 'env' ]
             self.options.merge_params( self.config, merge_key_list )
             if preset_name in self.config:
                 preset= self.config[preset_name]
@@ -240,8 +251,13 @@ class Assistant:
                 print( 'thrad_ts:', thread_ts, flush=True )
                 api.post_message(
                             channel_name,
-                            text=None,
-                            markdown_text=response,
+                            text=response,
+                            blocks= [
+                                {
+                                    'type': 'markdown',
+                                    'text': response
+                                }
+                            ],
                             thread_ts=thread_ts
                         )
                 api.save_cache()
@@ -260,7 +276,7 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.30 Hiroyuki Ogasawara' )
+    print( 'Assistant v1.31 Hiroyuki Ogasawara' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )

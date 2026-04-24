@@ -39,6 +39,8 @@ class ToolManager:
                 param_type= param.annotation.__name__
                 if param_type in type_to_name:
                     param_type= type_to_name[param_type]
+                else:
+                    print( 'Function type error: ', param_type )
             properties[param_name]= {
                 'type': param_type,
             }

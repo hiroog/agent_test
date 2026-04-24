@@ -18,4 +18,5 @@ pytee.py
 sample*.txt
 *.bak
 old
-/thread.json
+/src
+/threads/

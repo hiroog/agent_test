@@ -2,6 +2,7 @@
 
 S base_url  http://localhost:1234
 S provider  openai
+A inline_mcp
 
 
 ======== default
@@ -44,7 +45,7 @@ I top_k	    20
 
 
 ====T header
-**AI Assistant**
+# AI Assistant
 ====T base_prompt
 
 以下のエラーを日本語で解説してください。
