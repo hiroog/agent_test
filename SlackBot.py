@@ -15,7 +15,7 @@ from OllamaAPI4 import ExecTime
 from SlackAPI import save_json, load_json
 
 # env:
-#  SLACK_BOT_TOKEN
+#  SLACK_BOT_TOKEN or SLACK_API_TOKEN
 #  SLACK_APP_TOKEN
 
 # Slack APP
@@ -34,11 +34,14 @@ from SlackAPI import save_json, load_json
 #
 #          app_mention:read
 #          channels:history
+#          channels:read
 #          chat:write
 #          chat:write.customize
 #          groups:history
+#          groups:write
 #          reactions:read
 #          reactions:write
+#          users:read
 #
 #  Event Subscriptions
 #
@@ -52,7 +55,7 @@ from SlackAPI import save_json, load_json
 #
 #  Install App
 #      [Install to Workspace]
-#      Bot User OAuth Token      => SLACK_BOT_TOKEN
+#      Bot User OAuth Token      => SLACK_BOT_TOKEN (or SLACK_API_TOKEN)
 
 #------------------------------------------------------------------------------
 
@@ -287,7 +290,7 @@ def main( argv ):
     global slack_bot
     slack_bot= SlackBot( SlackBotOptions() )
 
-    app= App( token= os.environ['SLACK_BOT_TOKEN'] )
+    app= App( token= os.environ.get('SLACK_BOT_TOKEN', os.environ.get('SLACK_API_TOKEN')) )
     app.event('app_mention')( ack=respound_within_3_seconds, lazy=[handle_app_mention_events] )
     app.message()(ack=respound_within_3_seconds, lazy=[handle_message])
     handler= SocketModeHandler( app, os.environ['SLACK_APP_TOKEN'] )

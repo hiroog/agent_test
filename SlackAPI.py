@@ -74,6 +74,9 @@ class SlackAPI:
     def get_channel_id( self, channel_name ):
         if channel_name.startswith( '#' ):
             channel_name= channel_name[1:]
+        if channel_name.startswith( 'C' ):
+            if channel_name in self.channel_map.values():
+                return  channel_name
         if channel_name in self.channel_map:
             return  self.channel_map[channel_name]
         try:
