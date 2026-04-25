@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import json
+import threading
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
@@ -29,6 +30,7 @@ def load_json( file_name ):
 
 class SlackAPI:
     def __init__( self, token, cache_file=None, nossl=False ):
+        self.lock= threading.Lock()
         if nossl:
             import ssl
             ssl_context= ssl.create_default_context()
@@ -43,24 +45,27 @@ class SlackAPI:
         self.cache_file= 'slack_cache.json'
         if cache_file:
             self.cache_file= cache_file
+        self.cache_updated= False
         self.load_cache()
 
     def load_cache( self ):
-        self.cache_updated= False
-        cache= load_json( self.cache_file )
-        if cache:
-            print( 'load', self.cache_file, flush=True )
-            self.user_map= cache.get( 'user', {} )
-            self.channel_map= cache.get( 'channel', {} )
-            self.all_channels= cache.get( 'all_channels', [] )
+        with self.lock:
+            self.cache_updated= False
+            cache= load_json( self.cache_file )
+            if cache:
+                print( 'load', self.cache_file, flush=True )
+                self.user_map= cache.get( 'user', {} )
+                self.channel_map= cache.get( 'channel', {} )
+                self.all_channels= cache.get( 'all_channels', [] )
 
     def save_cache( self ):
-        if self.cache_updated:
-            save_json( self.cache_file, {'user':self.user_map, 'channel':self.channel_map, 'all_channels':self.all_channels} )
-            self.cache_updated= False
-            print( 'save', self.cache_file, flush=True )
+        with self.lock:
+            if self.cache_updated:
+                save_json( self.cache_file, {'user':self.user_map, 'channel':self.channel_map, 'all_channels':self.all_channels} )
+                self.cache_updated= False
+                print( 'save', self.cache_file, flush=True )
 
-    def update_channels( self ):
+    def update_channels_( self ):
         all_channels= []
         cursor= None
         try:
@@ -75,17 +80,18 @@ class SlackAPI:
         except SlackApiError as e:
             print( 'Error fetching channels: %s' % str(e.response['error']) )
             return
-        for channel in all_channels:
-            channel_id= channel['id']
-            name= channel['name']
-            self.channel_map[name]= channel_id
-        self.all_channels= all_channels
-        self.cache_updated= True
+        with self.lock:
+            for channel in all_channels:
+                channel_id= channel['id']
+                name= channel['name']
+                self.channel_map[name]= channel_id
+            self.all_channels= all_channels
+            self.cache_updated= True
         self.save_cache()
 
     def get_all_channels( self ):
         if self.all_channels == []:
-            self.update_channels()
+            self.update_channels_()
         return  self.all_channels
 
     def get_channel_id_0( self, channel_name ):
@@ -100,7 +106,7 @@ class SlackAPI:
 
     def get_channel_id( self, channel_name ):
         channel_id= self.get_channel_id_0( channel_name )
-        self.update_channels()
+        self.update_channels_()
         return  self.get_channel_id_0( channel_name )
 
     def get_user_info( self, user_id ):
@@ -118,8 +124,9 @@ class SlackAPI:
             if display_name == '':
                 display_name= user_name
             user_info= { 'user':user_name, 'display':display_name, 'real':real_name }
-            self.user_map[user_id]= user_info
-            self.cache_updated= True
+            with self.lock:
+                self.user_map[user_id]= user_info
+                self.cache_updated= True
             return  user_info
         except SlackApiError as e:
             print( 'Error fetching user: %s' % str(e.response['error']) )
@@ -138,7 +145,7 @@ class SlackAPI:
 #-------------------------------------------------------------------------------
 
 def usage():
-    print( 'SlackAPI.py v2.01 Hiroyuki Ogasawara' )
+    print( 'SlackAPI.py v2.10 Hiroyuki Ogasawara' )
     print( 'Usage: python SlackAPI.py' )
     print( 'SLACK_API_TOKEN must be set in the environment.' )
     print( 'options:' )
