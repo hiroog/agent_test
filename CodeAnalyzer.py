@@ -253,12 +253,12 @@ class CodeAnalyzer:
         issue_list= IssueList()
 
         with ExecTime( 'Generate' ):
-            response,status_code,prompt= self.assistant.generate_chain( input_obj )
+            response,status_code,local_options= self.assistant.generate_chain( input_obj )
 
         if status_code != 200:
             return  False
 
-        self.save_logs( response, prompt, file_list, issue_list )
+        self.save_logs( response, local_options.first_prompt, file_list, issue_list )
         return  True
 
     def analyze( self, file_list ):

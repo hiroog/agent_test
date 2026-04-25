@@ -50,6 +50,10 @@ class OptionBase:
             if key in params:
                 setattr( self, key, params[key] )
 
+    def copy_from( self, src ):
+        self.merge_params( src.__dict__, src.__dict__.keys() )
+        return  self
+
 #------------------------------------------------------------------------------
 
 class ExecTime:
@@ -97,9 +101,10 @@ class OllamaOptions(OptionBase):
         self.min_p= -1.0
         self.presence_penalty= -9.0
         self.frequency_penalty= -9.0
-        self.remove_think= True
+        self.remove_think= False
         self.debug_echo= False
         self.tools= None
+        self.tool_info_list= []
         self.apply_params( args )
 
 #------------------------------------------------------------------------------
@@ -151,34 +156,36 @@ class OllamaAPI:
 
     #--------------------------------------------------------------------------
 
-    def chat_oai_1( self, message_list, tools ):
-        if self.options.debug_echo:
+    def chat_oai_1( self, message_list, tools, options ):
+        if options.debug_echo:
             print( '============= SendMessages' )
             for message in message_list:
                 self.dump_message( message )
             print( '=============', flush=True )
         params= {
-            'model': self.options.model,
+            'model': options.model,
             'messages': message_list,
-            #'num_ctx': self.options.num_ctx,
+            #'num_ctx': options.num_ctx,
         }
-        if tools:
+        if options.tool_info_list != []:
+            params['tools']= options.tool_info_list
+        elif tools:
             params['tools']= tools.get_tools()
-        api_url= self.options.base_url + '/v1/chat/completions'
+        api_url= options.base_url + '/v1/chat/completions'
         data= json.dumps( params )
-        if self.options.temperature >= 0.0:
-            params['temperature']= self.options.temperature
-        if self.options.top_k > 0:
-            params['top_k']= self.options.top_k
-        if self.options.top_p > 0.0:
-            params['top_p']= self.options.top_p
-        if self.options.min_p >= 0.0:
-            params['min_p']= self.options.min_p
-        if self.options.presence_penalty >= -2.0:
-            params['presence_penalty']= self.options.presence_penalty
-        if self.options.frequency_penalty >= -2.0:
-            params['frequency_penalty']= self.options.frequency_penalty
-        if self.options.debug_echo:
+        if options.temperature >= 0.0:
+            params['temperature']= options.temperature
+        if options.top_k > 0:
+            params['top_k']= options.top_k
+        if options.top_p > 0.0:
+            params['top_p']= options.top_p
+        if options.min_p >= 0.0:
+            params['min_p']= options.min_p
+        if options.presence_penalty >= -2.0:
+            params['presence_penalty']= options.presence_penalty
+        if options.frequency_penalty >= -2.0:
+            params['frequency_penalty']= options.frequency_penalty
+        if options.debug_echo:
             dump_params= {}
             for key in params:
                 if key != 'messages':
@@ -190,14 +197,14 @@ class OllamaAPI:
         }
         try:
             start_time= time.perf_counter()
-            result= requests.post( api_url, headers=headers, data=data, timeout=self.options.timeout )
+            result= requests.post( api_url, headers=headers, data=data, timeout=options.timeout )
             request_time= time.perf_counter() - start_time
         except Exception as e:
             print( str(e), flush=True )
             return  '',408
         if result.status_code == 200:
             data= result.json()
-            if self.options.debug_echo:
+            if options.debug_echo:
                 print( '============= Response' )
                 self.dump_response( data )
                 print( '=============' )
@@ -210,8 +217,8 @@ class OllamaAPI:
             print( 'Error: %d' % result.status_code, flush=True )
         return  None,result.status_code
 
-    def chat_oai( self, text, system= None, image_data= None, message_list= None ):
-        tools= self.options.tools
+    def chat_oai( self, text, system= None, image_data= None, message_list= None, options= None ):
+        tools= options.tools
         if message_list is None:
             message_list= []
         message= {
@@ -232,14 +239,14 @@ class OllamaAPI:
             }
         if system:
             message_list.append( {
-                    'role': self.options.system_role,
+                    'role': options.system_role,
                     'content': system,
                 } )
         message_list.append( message )
         response= ''
         status_code= 408
         while True:
-            message,status_code= self.chat_oai_1( message_list, tools )
+            message,status_code= self.chat_oai_1( message_list, tools, options )
             if status_code != 200:
                 return  '',status_code
             role= message['role']
@@ -257,7 +264,7 @@ class OllamaAPI:
                         data= ''
                         if tools:
                             data= tools.call_func( func_name, arguments )
-                        #if self.options.debug_echo:
+                        #if options.debug_echo:
                         #    print( '**TOOL**', data, flush=True )
                         message= {
                                 'role': 'tool',
@@ -268,7 +275,7 @@ class OllamaAPI:
                         message_list.append( message )
                     continue
                 response= message.get( 'content', '' )
-                if self.options.remove_think:
+                if options.remove_think:
                     response= self.remove_think_tag( response )
             break
         return  response,status_code
@@ -385,33 +392,35 @@ class OllamaAPI:
             message['tool_calls']= tools
         return  data
 
-    def chat_ollama_1( self, message_list, tools, streaming= False ):
-        if self.options.debug_echo:
+    def chat_ollama_1( self, message_list, tools, streaming= False, options= None ):
+        if options.debug_echo:
             print( '============= SendMessages' )
             for message in message_list:
                 self.dump_message( message )
             print( '=============', flush=True )
         params= {
-            'model': self.options.model,
+            'model': options.model,
             'messages': message_list,
             'stream': streaming,
             'options': {
-                'num_ctx': self.options.num_ctx,
+                'num_ctx': options.num_ctx,
             },
         }
-        if self.options.temperature >= 0.0:
-            params['options']['temperature']= self.options.temperature
-        if self.options.top_k > 0:
-            params['options']['top_k']= self.options.top_k
-        if self.options.top_p > 0.0:
-            params['options']['top_p']= self.options.top_p
-        if self.options.min_p >= 0.0:
-            params['options']['min_p']= self.options.min_p
-        if tools:
+        if options.temperature >= 0.0:
+            params['options']['temperature']= options.temperature
+        if options.top_k > 0:
+            params['options']['top_k']= options.top_k
+        if options.top_p > 0.0:
+            params['options']['top_p']= options.top_p
+        if options.min_p >= 0.0:
+            params['options']['min_p']= options.min_p
+        if options.tool_info_list != []:
+            params['tools']= options.tool_info_list
+        elif tools:
             params['tools']= tools.get_tools()
-        api_url= self.options.base_url + '/api/chat'
+        api_url= options.base_url + '/api/chat'
         data= json.dumps( params )
-        if self.options.debug_echo:
+        if options.debug_echo:
             print( 'options=', params['options'], flush=True )
         headers= {
             'Content-Type': 'application/json',
@@ -419,7 +428,7 @@ class OllamaAPI:
         }
         try:
             start_time= time.perf_counter()
-            result= requests.post( api_url, headers=headers, data=data, timeout=self.options.timeout )
+            result= requests.post( api_url, headers=headers, data=data, timeout=options.timeout )
             request_time= time.perf_counter() - start_time
         except Exception as e:
             return  None,408
@@ -428,7 +437,7 @@ class OllamaAPI:
                 data= self.decode_streaming( result )
             else:
                 data= result.json()
-            if self.options.debug_echo:
+            if options.debug_echo:
                 print( '============= Response' )
                 self.dump_response( data )
                 print( '=============' )
@@ -439,8 +448,8 @@ class OllamaAPI:
             print( 'Error: %d' % result.status_code, flush=True )
         return  None,result.status_code
 
-    def generate_ollama_chat( self, text, system= None, image_data= None, message_list= None ):
-        tools= self.options.tools
+    def generate_ollama_chat( self, text, system= None, image_data= None, message_list= None, options= None ):
+        tools= options.tools
         if message_list is None:
             message_list= []
         message= {
@@ -458,7 +467,7 @@ class OllamaAPI:
         response= ''
         status_code= 408
         while True:
-            message,status_code= self.chat_ollama_1( message_list, tools )
+            message,status_code= self.chat_ollama_1( message_list, tools, options )
             if status_code != 200:
                 return  '',status_code
             role= message['role']
@@ -475,7 +484,7 @@ class OllamaAPI:
                         data= ''
                         if tools:
                             data= tools.call_func( func_name, arguments )
-                        #if self.options.debug_echo:
+                        #if options.debug_echo:
                         #    print( '**TOOL**', data, flush=True )
                         message= {
                                 'role': 'tool',
@@ -485,18 +494,20 @@ class OllamaAPI:
                         message_list.append( message )
                     continue
                 response= message.get( 'content', '' )
-                if self.options.remove_think:
+                if options.remove_think:
                     response= self.remove_think_tag( response )
             break
         return  response,status_code
 
     #--------------------------------------------------------------------------
 
-    def generate( self, text, system= None, image_data= None, message_list= None ):
-        if self.options.provider.startswith( 'ollama' ):
-            return  self.generate_ollama_chat( text, system, image_data, message_list )
-        elif self.options.provider == 'lmstudio' or self.options.provider == 'openai':
-            return  self.chat_oai( text, system, image_data, message_list )
+    def generate( self, text, system= None, image_data= None, message_list= None, options= None ):
+        if options is None:
+            options= self.options
+        if options.provider.startswith( 'ollama' ):
+            return  self.generate_ollama_chat( text, system, image_data, message_list, options )
+        elif options.provider == 'lmstudio' or options.provider == 'openai':
+            return  self.chat_oai( text, system, image_data, message_list, options )
         return  '',400
 
     #--------------------------------------------------------------------------
@@ -511,7 +522,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.31 Hiroyuki Ogasawara' )
+    print( 'OllamaAPI v4.40 Hiroyuki Ogasawara' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )

@@ -102,18 +102,23 @@ class AssistantOptions(OllamaAPI4.OllamaOptions):
         self.nossl= False
         self.prompt_dir= '.'
         self.env= []
+        self.base_prompt= None
+        self.system_prompt= None
+        self.header= ''
         self.apply_params( args )
-        self.chat_mode= False
 
 #------------------------------------------------------------------------------
 
 class Assistant:
+
+    MERGE_KEY_LIST= [ 'base_url', 'provider', 'model', 'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'presence_penalty', 'frequency_penalty', 'env', 'base_prompt', 'system_prompt', 'header' ]
+
     def __init__( self, options ):
         self.config= self.load_file( options.config_file )
         options.tools= Functions.get_tools()
         options.tools.debug_echo= options.debug_echo
         self.options= options
-        self.load_preset( options.preset )
+        self.options.merge_params( self.config, self.MERGE_KEY_LIST )
         self.set_env( self.options.env )
         self.ollama_api= OllamaAPI4.OllamaAPI( options )
         self.import_inline_modules()
@@ -149,19 +154,17 @@ class Assistant:
             return  prompt
         return  base_prompt
 
-    def load_preset( self, preset_name ):
+    def load_preset2( self, preset_name ):
+        local_options= AssistantOptions().copy_from( self.options )
         if self.config:
-            merge_key_list= [ 'base_url', 'provider', 'model', 'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'presence_penalty', 'frequency_penalty', 'env' ]
-            self.options.merge_params( self.config, merge_key_list )
             if preset_name in self.config:
                 preset= self.config[preset_name]
-                self.options.merge_params( preset, merge_key_list )
-                self.options.tools.select_tools( preset['tools'] )
-                prompt= preset.get( 'base_prompt', None )
+                local_options.merge_params( preset, self.MERGE_KEY_LIST )
+                if local_options.tools:
+                    local_options.tool_info_list= local_options.tools.select_tools( preset.get('tools') )
                 if 'include_prompt' in preset:
-                    prompt= self.load_prompt( preset['include_prompt'], prompt )
-                return  prompt,preset.get( 'system_prompt', None ),preset.get( 'header', '' )
-        return  None,None,''
+                    local_options.base_prompt= self.load_prompt( preset['include_prompt'], None )
+        return  local_options
 
     def set_env( self, env_list ):
         for name in env_list:
@@ -175,28 +178,31 @@ class Assistant:
             message_list= []
         if preset_name is None:
             preset_name= input_obj.get( 'preset', self.options.preset )
-        preset_prompt,preset_system,preset_header= self.load_preset( preset_name )
+        local_options= self.load_preset2( preset_name )
         prompt= input_obj['prompt']
         system= input_obj.get( 'system', None )
         if message_list == []:
-            if preset_prompt:
-                prompt= preset_prompt + '\n' + prompt
-            if preset_system and system:
-                system+= preset_system + '\n' + system
+            if local_options.base_prompt:
+                prompt= local_options.base_prompt + '\n' + prompt
+            if local_options.system_prompt:
+                if system:
+                    local_options.system_prompt+= '\n' + system
+                system= local_options.system_prompt
         if 'model' in input_obj:
-            self.options.model= input_obj['model']
+            local_options.model= input_obj['model']
         self.set_env( self.options.env )
         if 'env' in input_obj:
             self.set_env( input_obj['env'] )
-        header_text= input_obj.get( 'header', preset_header )
-        response,status_code= self.ollama_api.generate( prompt, system, None, message_list )
+        header_text= input_obj.get( 'header', local_options.header )
+        response,status_code= self.ollama_api.generate( prompt, system, None, message_list, local_options )
         if status_code != 200:
             print( 'Generate Error: %d' % status_code, flush=True )
             return  response,status_code,prompt
         if len(response) >= 1 and response[-1] != '\n':
             response+= '\n'
         response= header_text + response
-        return  response,status_code,prompt
+        local_options.prompt= prompt
+        return  response,status_code,local_options
 
     def generate_chain( self, input_obj ):
         preset_name= input_obj.get( 'preset', self.options.preset )
@@ -207,13 +213,14 @@ class Assistant:
                     first_prompt= None
                     for chain_name in preset['chain']:
                         print( '>>>>> %s' % chain_name, flush=True )
-                        response,status_code,prompt= self.generate_text( input_obj, chain_name )
+                        response,status_code,local_options= self.generate_text( input_obj, chain_name )
                         if first_prompt is None:
-                            first_prompt= prompt
+                            first_prompt= local_options.prompt
                         if status_code != 200:
                             break
                         input_obj['prompt']= response
-                    return  response,status_code,first_prompt
+                    local_options.first_prompt= first_prompt
+                    return  response,status_code,local_options
         return  self.generate_text( input_obj, preset_name )
 
     #--------------------------------------------------------------------------
@@ -236,7 +243,7 @@ class Assistant:
                     return
             else:
                 input_obj= { 'prompt':'' }
-            response,status_code,prompt= self.generate_chain( input_obj )
+            response,status_code,local_options= self.generate_chain( input_obj )
             if status_code != 200:
                 return
             if self.options.channel:
@@ -265,7 +272,7 @@ class Assistant:
                 with open( self.options.output_text, 'w', encoding='utf-8' ) as fo:
                     fo.write( response )
             if self.options.print:
-                print( '** INPUT\n', prompt )
+                print( '** INPUT\n', local_options.first_prompt )
                 print( '\n** RESPONSE\n', response, flush=True )
             if self.options.debug_echo:
                 self.stat_dump()
@@ -276,7 +283,7 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.31 Hiroyuki Ogasawara' )
+    print( 'Assistant v1.33 Hiroyuki Ogasawara' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )

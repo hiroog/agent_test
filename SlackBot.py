@@ -135,7 +135,7 @@ class SlackBot:
     #--------------------------------------------------------------------------
     # Assistant API
 
-    def bot( self, thread_id, prompt, msg_id ):
+    def bot( self, thread_id, prompt, msg_id, channel ):
         with ExecTime( 'Generate' ):
             thread_info,thread_lock= self.thread_cache.get_thread_info( thread_id )
             with thread_lock:
@@ -147,7 +147,10 @@ class SlackBot:
                 message_list= thread_info['message_list']
                 try:
                     if True:
-                        response,status_code,prompt= self.assistant.generate_text( input_obj, None, message_list )
+                        response,status_code,local_options= self.assistant.generate_text( input_obj, None, message_list )
+                        local_options.tools= ''
+                        thread_info['options']= local_options.__dict__
+                        thread_info['channel']= channel
                     else:
                         response= '返答だよ'
                 finally:
@@ -181,7 +184,7 @@ class SlackBot:
         user= message.get( 'user', '' )
         prompt= f'{user}: {text}'
 
-        reply_text= self.bot( thread_id, prompt, msg_id )
+        reply_text= self.bot( thread_id, prompt, msg_id, channel )
         say( text=reply_text, thread_ts=thread_id, blocks= [
                 {
                     'type': 'markdown',

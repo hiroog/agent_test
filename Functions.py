@@ -64,6 +64,7 @@ class ToolManager:
                 print( 'Add: Function "%s"' % name )
                 tool_list.append( self.func_map[name][0] )
         self.info_list= tool_list
+        return  tool_list
 
     def get_tools( self ):
         return  self.info_list
