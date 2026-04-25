@@ -39,6 +39,7 @@ class SlackAPI:
             self.client = WebClient( token=token )
         self.user_map= {}
         self.channel_map= {}
+        self.all_channels= []
         self.cache_file= 'slack_cache.json'
         if cache_file:
             self.cache_file= cache_file
@@ -51,27 +52,43 @@ class SlackAPI:
             print( 'load', self.cache_file, flush=True )
             self.user_map= cache.get( 'user', {} )
             self.channel_map= cache.get( 'channel', {} )
+            self.all_channels= cache.get( 'all_channels', [] )
 
     def save_cache( self ):
         if self.cache_updated:
-            save_json( self.cache_file, {'user':self.user_map, 'channel':self.channel_map} )
+            save_json( self.cache_file, {'user':self.user_map, 'channel':self.channel_map, 'all_channels':self.all_channels} )
             self.cache_updated= False
             print( 'save', self.cache_file, flush=True )
 
-    def get_all_channels( self ):
+    def update_channels( self ):
         all_channels= []
         cursor= None
-        while True:
-            result= self.client.conversations_list( cursor=cursor, limit=800, types="public_channel" )
-            time.sleep( 1.0 )
-            channels= result.get( "channels", [] )
-            all_channels.extend( channels )
-            cursor= result.get( 'response_metadata', {} ).get( 'next_cursor', None )
-            if cursor is None or cursor == '' or channels == []:
-                break
-        return  all_channels
+        try:
+            while True:
+                result= self.client.conversations_list( cursor=cursor, limit=800, types="public_channel,private_channel" )
+                time.sleep( 1.0 )
+                channels= result.get( "channels", [] )
+                all_channels.extend( channels )
+                cursor= result.get( 'response_metadata', {} ).get( 'next_cursor', None )
+                if cursor is None or cursor == '' or channels == []:
+                    break
+        except SlackApiError as e:
+            print( 'Error fetching channels: %s' % str(e.response['error']) )
+            return
+        for channel in all_channels:
+            channel_id= channel['id']
+            name= channel['name']
+            self.channel_map[name]= channel_id
+        self.all_channels= all_channels
+        self.cache_updated= True
+        self.save_cache()
 
-    def get_channel_id( self, channel_name ):
+    def get_all_channels( self ):
+        if self.all_channels == []:
+            self.update_channels()
+        return  self.all_channels
+
+    def get_channel_id_0( self, channel_name ):
         if channel_name.startswith( '#' ):
             channel_name= channel_name[1:]
         if channel_name.startswith( 'C' ):
@@ -79,17 +96,12 @@ class SlackAPI:
                 return  channel_name
         if channel_name in self.channel_map:
             return  self.channel_map[channel_name]
-        try:
-            channels= self.get_all_channels()
-            for channel in channels:
-                channel_id= channel['id']
-                name= channel['name']
-                self.channel_map[name]= channel_id
-            self.cache_updated= True
-        except SlackApiError as e:
-            print( 'Error fetching channels: %s' % str(e.response['error']) )
-            return  None
-        return  self.channel_map.get( channel_name, None )
+        return  None
+
+    def get_channel_id( self, channel_name ):
+        channel_id= self.get_channel_id_0( channel_name )
+        self.update_channels()
+        return  self.get_channel_id_0( channel_name )
 
     def get_user_info( self, user_id ):
         if user_id in self.user_map:

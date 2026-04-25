@@ -221,7 +221,9 @@ class Assistant:
                         input_obj['prompt']= response
                     local_options.first_prompt= first_prompt
                     return  response,status_code,local_options
-        return  self.generate_text( input_obj, preset_name )
+        response,status_code,local_options= self.generate_text( input_obj, preset_name )
+        local_options.first_prompt= local_options.prompt
+        return  response,status_code,local_options
 
     #--------------------------------------------------------------------------
 

@@ -38,6 +38,7 @@ from SlackAPI import save_json, load_json
 #          chat:write
 #          chat:write.customize
 #          groups:history
+#          groups:read
 #          groups:write
 #          reactions:read
 #          reactions:write
