@@ -114,6 +114,7 @@ class SlackBotOptions(Assistant.AssistantOptions):
         super().__init__()
         self.preset= 'chatbot'
         self.debug_echo= True
+        self.response_all= True
         #---------------------------
         self.apply_params( args )
 
@@ -155,6 +156,8 @@ class SlackBot:
                         local_options.tools= ''
                         thread_info['options']= local_options.__dict__
                         thread_info['channel']= channel
+                        if status_code != 200:
+                            response= '\nserver error: %d\n' % status_code
                     else:
                         response= '返答だよ'
                 finally:

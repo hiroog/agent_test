@@ -1,8 +1,8 @@
 ;; vim:ts=4 sw=4 et:
 
-S base_url  http://localhost:1234
-S model     qwen/qwen3.5-9b
-S provider  openai
+;;S base_url  http://localhost:1234
+;;S model     qwen/qwen3.5-9b
+;;S provider  openai
 A inline_mcp  SourceBrowser SlackTools
 
 

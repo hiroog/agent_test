@@ -22,4 +22,6 @@ old
 /src
 /threads/
 /botenv/
+/web/
 /analyzer_stat.json
+/webfetch_whitelist.txt

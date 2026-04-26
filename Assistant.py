@@ -190,6 +190,7 @@ class Assistant:
                 system= local_options.system_prompt
         if 'model' in input_obj:
             local_options.model= input_obj['model']
+        local_options.prompt= prompt
         self.set_env( self.options.env )
         if 'env' in input_obj:
             self.set_env( input_obj['env'] )
@@ -197,11 +198,10 @@ class Assistant:
         response,status_code= self.ollama_api.generate( prompt, system, None, message_list, local_options )
         if status_code != 200:
             print( 'Generate Error: %d' % status_code, flush=True )
-            return  response,status_code,prompt
+            return  response,status_code,local_options
         if len(response) >= 1 and response[-1] != '\n':
             response+= '\n'
         response= header_text + response
-        local_options.prompt= prompt
         return  response,status_code,local_options
 
     def generate_chain( self, input_obj ):
@@ -299,6 +299,7 @@ def usage():
     print( '  --save <output.txt>' )
     print( '  --post <channel>' )
     print( '  --timeout <sec>             (default: 600)' )
+    print( '  --response_all' )
     print( '  --print' )
     print( '  --debug' )
     print( 'ex. python Assistant.py --input prompt.txt --print' )
@@ -338,6 +339,8 @@ def main( argv ):
                 ai= options.set_int( ai, argv, 'num_ctx' )
             elif arg == '--timeout':
                 ai= options.set_int( ai, argv, 'timeout' )
+            elif arg == '--response_all':
+                ai= options.response_all= True
             elif arg == '--nossl':
                 ai= options.nossl= True
             elif arg == '--print':

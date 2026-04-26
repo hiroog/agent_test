@@ -9,8 +9,18 @@ USE_TEST04=1
 USE_TEST05=1
 USE_TEST10=1
 USE_ASSISTANT1=1
-USE_CPPREVIEW=1
+USE_CPPREVIEW=0
 USE_SLACKBOT=0
+
+#------------------------------------------------------------------------------
+
+BASE_URL=http://localhost:1234
+PROVIDER=openai
+MODEL=qwen/qwen3.5-9b
+
+BASE_URL=http://localhost:11434
+PROVIDER=ollama
+MODEL=gpt-oss:120b-cloud
 
 #------------------------------------------------------------------------------
 
@@ -26,35 +36,37 @@ if [ -e $SLACKENV_FILE ]; then
     . $SLACKENV_FILE
 fi
 
+BASE_OPTIONS="--model $MODEL --host $BASE_URL --provider $PROVIDER --config $CONFIG_FILE"
+
 #------------------------------------------------------------------------------
 
 # tool calling
 if [ $USE_TEST01 = 1 ];then
-python3 Assistant.py --config $CONFIG_FILE --preset test01 --input input/test01.txt --print --debug
+python3 Assistant.py $BASE_OPTIONS --preset test01 --input input/test01.txt --print --debug
 fi
 if [ $USE_TEST02 = 1 ];then
-python3 Assistant.py --config $CONFIG_FILE --preset test02 --input input/test02.txt --print --debug
+python3 Assistant.py $BASE_OPTIONS --preset test02 --input input/test02.txt --print --debug
 fi
 
 # inline propt
 if [ $USE_TEST03 = 1 ];then
-python3 Assistant.py --config $CONFIG_FILE --preset test03                          --print --debug
+python3 Assistant.py $BASE_OPTIONS --preset test03                          --print --debug
 fi
 
 # input
 if [ $USE_TEST04 = 1 ];then
-python3 Assistant.py --config $CONFIG_FILE                 --input input/test04.txt --print --debug
+python3 Assistant.py $BASE_OPTIONS                 --input input/test04.txt --print --debug
 fi
 
 # include
 if [ $USE_TEST05 = 1 ];then
-python3 Assistant.py --config $CONFIG_FILE --preset test05                          --print --debug
+python3 Assistant.py $BASE_OPTIONS --preset test05                          --print --debug
 fi
 
 # complex tool calling
 if [ $USE_TEST10 = 1 ];then
   if [ -e src/flatlib5 ];then
-python3 Assistant.py --config $CONFIG_FILE --preset test10 --input input/test10.txt --print --debug
+python3 Assistant.py $BASE_OPTIONS --preset test10 --input input/test10.txt --print --debug
   fi
 fi
 
@@ -68,7 +80,7 @@ if [ $USE_SLACK = 1 ];then
 fi
 
 if [ $USE_ASSISTANT1 = 1 ];then
-python3 Assistant.py --config $CONFIG_FILE --preset assistant1 --print --debug $POST_FLAG
+python3 Assistant.py $BASE_OPTIONS --preset assistant1 --print --debug $POST_FLAG
 fi
 
 #------------------------------------------------------------------------------

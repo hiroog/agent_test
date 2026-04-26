@@ -102,6 +102,7 @@ class OllamaOptions(OptionBase):
         self.presence_penalty= -9.0
         self.frequency_penalty= -9.0
         self.remove_think= False
+        self.response_all= False
         self.debug_echo= False
         self.tools= None
         self.tool_info_list= []
@@ -188,7 +189,7 @@ class OllamaAPI:
         if options.debug_echo:
             dump_params= {}
             for key in params:
-                if key != 'messages':
+                if key != 'messages' and key != 'tools':
                     dump_params[key]= params[key]
             print( 'options=', dump_params, flush=True )
         headers= {
@@ -200,6 +201,8 @@ class OllamaAPI:
             result= requests.post( api_url, headers=headers, data=data, timeout=options.timeout )
             request_time= time.perf_counter() - start_time
         except Exception as e:
+            print( 'err-url:',api_url )
+            print( 'err-datasize:',len(data) )
             print( str(e), flush=True )
             return  '',408
         if result.status_code == 200:
@@ -214,6 +217,8 @@ class OllamaAPI:
             message= data['choices'][0]['message']
             return  message,result.status_code
         else:
+            print( 'err-url:',api_url )
+            print( 'err-datasize:',len(data) )
             print( 'Error: %d' % result.status_code, flush=True )
         return  None,result.status_code
 
@@ -249,11 +254,11 @@ class OllamaAPI:
             message,status_code= self.chat_oai_1( message_list, tools, options )
             if status_code != 200:
                 return  '',status_code
+            message_list.append( message )
             role= message['role']
             if role == 'assistant':
                 if 'content' in message:
-                    assistant_content= message['content']
-                    message_list.append( message )
+                    response+= message['content'] + '\n'
                 tool_calls= message.get( 'tool_calls', None )
                 if tool_calls:
                     for tool_call in tool_calls:
@@ -273,8 +278,11 @@ class OllamaAPI:
                                 'content': data,
                             }
                         message_list.append( message )
+                        if options.response_all:
+                            response+= 'toolcall: %s\n' % func_name
                     continue
-                response= message.get( 'content', '' )
+                if not options.response_all:
+                    response= message.get( 'content', response )
                 if options.remove_think:
                     response= self.remove_think_tag( response )
             break
@@ -431,6 +439,9 @@ class OllamaAPI:
             result= requests.post( api_url, headers=headers, data=data, timeout=options.timeout )
             request_time= time.perf_counter() - start_time
         except Exception as e:
+            print( 'err-url:',api_url )
+            print( 'err-datasize:',len(data) )
+            print( str(e), flush=True )
             return  None,408
         if result.status_code == 200:
             if streaming:
@@ -445,6 +456,8 @@ class OllamaAPI:
             message= data['message']
             return  message,result.status_code
         else:
+            print( 'err-url:',api_url )
+            print( 'err-datasize:',len(data) )
             print( 'Error: %d' % result.status_code, flush=True )
         return  None,result.status_code
 
@@ -467,14 +480,14 @@ class OllamaAPI:
         response= ''
         status_code= 408
         while True:
-            message,status_code= self.chat_ollama_1( message_list, tools, options )
+            message,status_code= self.chat_ollama_1( message_list, tools, False, options )
             if status_code != 200:
                 return  '',status_code
+            message_list.append( message )
             role= message['role']
             if role == 'assistant':
                 if 'content' in message:
-                    assistant_content= message['content']
-                    message_list.append( message )
+                    response+= message['content']
                 tool_calls= message.get( 'tool_calls', None )
                 if tool_calls:
                     for tool_call in tool_calls:
@@ -492,8 +505,11 @@ class OllamaAPI:
                                 'content': data,
                             }
                         message_list.append( message )
+                        if options.response_all:
+                            response+= 'toolcall: %s\n' % func_name
                     continue
-                response= message.get( 'content', '' )
+                if not options.response_all:
+                    response= message.get( 'content', response )
                 if options.remove_think:
                     response= self.remove_think_tag( response )
             break
