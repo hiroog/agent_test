@@ -1,0 +1,5 @@
+S preset test04
+
+====T prompt
+今日の渋谷の天気は
+

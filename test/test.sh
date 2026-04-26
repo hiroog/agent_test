@@ -14,16 +14,6 @@ USE_SLACKBOT=0
 
 #------------------------------------------------------------------------------
 
-BASE_URL=http://localhost:1234
-PROVIDER=openai
-MODEL=qwen/qwen3.5-9b
-
-BASE_URL=http://localhost:11434
-PROVIDER=ollama
-MODEL=gpt-oss:120b-cloud
-
-#------------------------------------------------------------------------------
-
 BOTVENV_DIR=botenv
 SLACKENV_FILE=../setenv.sh
 CONFIG_FILE=test/test_config.txt
@@ -36,7 +26,7 @@ if [ -e $SLACKENV_FILE ]; then
     . $SLACKENV_FILE
 fi
 
-BASE_OPTIONS="--model $MODEL --host $BASE_URL --provider $PROVIDER --config $CONFIG_FILE"
+BASE_OPTIONS="--config $CONFIG_FILE"
 
 #------------------------------------------------------------------------------
 

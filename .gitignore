@@ -2,7 +2,6 @@ __pycache__
 *.bat
 *.7z
 *.zip
-/input/
 /output*/
 /logs/
 /sources/

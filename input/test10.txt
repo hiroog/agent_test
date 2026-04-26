@@ -1,0 +1,12 @@
+S preset test10
+A env MCP_FOLDER_ROOT=src/flatlib5 MCP_SOURCE_ROOT=src/flatlib5
+
+====T prompt
+
+flatlib5 という C++ のライブラリフォルダがあります
+ソースコードも含まれています
+Tool を使って検索と読み込みができます
+
+このライブラリを使ってファイル名を指定してファイルを読み込む方法を解説して
+
+

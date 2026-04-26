@@ -4,6 +4,7 @@
 import sys
 import os
 import threading
+import time
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
@@ -131,6 +132,13 @@ class SlackBotOptions(Assistant.AssistantOptions):
 #     "queue": []
 # }
 
+def _format_ts( ts ):
+    try:
+        t= float( ts )
+    except (TypeError, ValueError):
+        return ts
+    return time.strftime( '%Y-%m-%d %H:%M:%S', time.localtime( t ) )
+
 class SlackBot:
     def __init__( self, options ):
         self.options= options
@@ -144,12 +152,14 @@ class SlackBot:
         with ExecTime( 'Generate' ):
             thread_info,thread_lock= self.thread_cache.get_thread_info( thread_id )
             with thread_lock:
-                input_obj= {
-                    'prompt': prompt,
-                }
                 thread_info['mtime']= ExecTime().get_date()
                 thread_info['msg_id']= msg_id
                 message_list= thread_info['message_list']
+                #if message_list == []:
+                #    prompt= 'channel=%s thread_ts=%s channel-date=%s\n\n%s' % (channel, thread_id, self.format_ts(thread_id), prompt)
+                input_obj= {
+                    'prompt': prompt,
+                }
                 try:
                     if True:
                         response,status_code,local_options= self.assistant.generate_text( input_obj, None, message_list )
@@ -189,7 +199,8 @@ class SlackBot:
 
         text= message.get( 'text', '' )
         user= message.get( 'user', '' )
-        prompt= f'{user}: {text}'
+        tsstr= _format_ts( ts )
+        prompt= f'{tsstr} {user}: {text}'
 
         reply_text= self.bot( thread_id, prompt, msg_id, channel )
         say( text=reply_text, thread_ts=thread_id, blocks= [
