@@ -22,5 +22,6 @@ old
 /threads/
 /botenv/
 /web/
+/docs/
 /analyzer_stat.json
 /webfetch_whitelist.txt
