@@ -148,6 +148,10 @@ def get_channel_messages( channel: str, hours: int, max_count: int ) -> str:
         reply_count= m.get( 'reply_count', 0 )
         user= _user_label( api, m )
         text= m.get( 'text', '' )
+        if text == '':
+            if 'attachments' in m:
+                for attach in m['attachments']:
+                    text+= attach.get('text', attach.get('fallback', '') ) + '\n'
         thread_mark= ''
         if thread_ts and thread_ts == ts and reply_count > 0:
             thread_mark= '  thread_ts=%s replies=%d' % ( thread_ts, reply_count )
@@ -188,6 +192,10 @@ def get_thread_messages( channel: str, thread_ts: str, max_count: int ) -> str:
         ts= m.get( 'ts', '' )
         user= _user_label( api, m )
         text= m.get( 'text', '' )
+        if text == '':
+            if 'attachments' in m:
+                for attach in m['attachments']:
+                    text+= attach.get('text', attach.get('fallback', '') ) + '\n'
         lines.append( '[%s] %s\n%s' % ( _format_ts( ts ), user, _quote_body( text ) ) )
     api.save_cache()
     source= '#%s thread %s, %d messages' % ( channel.lstrip('#'), thread_ts, len( lines ) )
