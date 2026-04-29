@@ -105,7 +105,18 @@ class AssistantOptions(OllamaAPI4.OllamaOptions):
         self.base_prompt= None
         self.system_prompt= None
         self.header= ''
+        self.tool_env= Functions.ToolEnv()
         self.apply_params( args )
+
+    def copy_from( self, src ):
+        super().copy_from( src )
+        self.tool_env= Functions.ToolEnv( src.tool_env.env )
+        return  self
+
+    def set_env( self, env_list ):
+        for name in env_list:
+            params= name.split( '=' )
+            self.tool_env.set( params[0], params[1] )
 
 #------------------------------------------------------------------------------
 
@@ -117,9 +128,10 @@ class Assistant:
         self.config= self.load_file( options.config_file )
         options.tools= Functions.get_tools()
         options.tools.debug_echo= options.debug_echo
+        options.tool_env= Functions.ToolEnv()
         self.options= options
         self.options.merge_params( self.config, self.MERGE_KEY_LIST )
-        self.set_env( self.options.env )
+        options.set_env( self.options.env )
         self.ollama_api= OllamaAPI4.OllamaAPI( options )
         self.import_inline_modules()
 
@@ -161,15 +173,10 @@ class Assistant:
                 preset= self.config[preset_name]
                 local_options.merge_params( preset, self.MERGE_KEY_LIST )
                 if local_options.tools:
-                    local_options.tool_info_list= local_options.tools.select_tools( preset.get('tools') )
+                    local_options.tool_info_list= local_options.tools.get_tools( preset.get('tools') )
                 if 'include_prompt' in preset:
                     local_options.base_prompt= self.load_prompt( preset['include_prompt'], None )
         return  local_options
-
-    def set_env( self, env_list ):
-        for name in env_list:
-            params= name.split( '=' )
-            os.environ[params[0]]= params[1]
 
     #--------------------------------------------------------------------------
 
@@ -191,9 +198,9 @@ class Assistant:
         if 'model' in input_obj:
             local_options.model= input_obj['model']
         local_options.prompt= prompt
-        self.set_env( self.options.env )
+        local_options.set_env( self.options.env )
         if 'env' in input_obj:
-            self.set_env( input_obj['env'] )
+            local_options.set_env( input_obj['env'] )
         header_text= input_obj.get( 'header', local_options.header )
         response,status_code= self.ollama_api.generate( prompt, system, None, message_list, local_options )
         if status_code != 200:
@@ -285,7 +292,7 @@ class Assistant:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.33 Hiroyuki Ogasawara' )
+    print( 'Assistant v1.34 Hiroyuki Ogasawara' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )

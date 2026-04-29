@@ -106,6 +106,7 @@ class OllamaOptions(OptionBase):
         self.debug_echo= False
         self.tools= None
         self.tool_info_list= []
+        self.tool_env= os.environ
         self.apply_params( args )
 
 #------------------------------------------------------------------------------
@@ -268,7 +269,7 @@ class OllamaAPI:
                         arguments= json.loads(function['arguments'])
                         data= ''
                         if tools:
-                            data= tools.call_func( func_name, arguments )
+                            data= tools.call_func( func_name, arguments, options.tool_env )
                         #if options.debug_echo:
                         #    print( '**TOOL**', data, flush=True )
                         message= {
@@ -496,7 +497,7 @@ class OllamaAPI:
                         arguments= function['arguments']
                         data= ''
                         if tools:
-                            data= tools.call_func( func_name, arguments )
+                            data= tools.call_func( func_name, arguments, options.tool_env )
                         #if options.debug_echo:
                         #    print( '**TOOL**', data, flush=True )
                         message= {
@@ -538,7 +539,7 @@ class OllamaAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'OllamaAPI v4.40 Hiroyuki Ogasawara' )
+    print( 'OllamaAPI v4.41 Hiroyuki Ogasawara' )
     print( 'usage: OllamaAPI4 [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )

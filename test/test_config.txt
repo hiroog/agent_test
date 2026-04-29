@@ -1,7 +1,11 @@
 ;; vim:ts=4 sw=4 et:
 
-S base_url  http://192.168.2.3:1234
-S model     qwen/qwen3.5-9b
+;;S base_url  http://localhost:1234
+;;S model     qwen/qwen3.5-9b
+;;S provider  openai
+
+S base_url  http://localhost:11434
+S model     gpt-oss:120b-cloud
 S provider  openai
 
 ;;S base_url  http://localhost:11434
@@ -170,6 +174,7 @@ F min_p     0.01
 F top_p     0.95
 I top_k     20
 F presence_penalty  0.0
+
 
 ====T system_prompt
 

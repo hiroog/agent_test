@@ -9,6 +9,21 @@ import time
 
 #------------------------------------------------------------------------------
 
+class ToolEnv:
+    def __init__( self, src= None ):
+        self.env= {}
+        if src:
+            self.env.update( src )
+
+    def set( self, env_name, value ):
+        self.env[env_name]= value
+
+    def get( self, env_name, defvalue ):
+        if env_name in self.env:
+            return  self.env[env_name]
+        return  os.environ.get( env_name, defvalue )
+
+
 class ToolManager:
     def __init__( self ):
         self.info_list= []
@@ -31,12 +46,16 @@ class ToolManager:
             }
         }
         sig= inspect.signature( func )
+        with_env= False
         properties= {}
         required= []
         for param_name,param in sig.parameters.items():
             param_type= 'string'
             if param.annotation != inspect._empty:
                 param_type= param.annotation.__name__
+                if param_type == 'ToolEnv':
+                    with_env= True
+                    continue
                 if param_type in type_to_name:
                     param_type= type_to_name[param_type]
                 else:
@@ -48,33 +67,43 @@ class ToolManager:
         if len(properties) > 0:
             func_info['parameters']['properties']= properties
             func_info['parameters']['required']= required
-        return  { 'type': 'function', 'function': func_info }
+        return  { 'type': 'function', 'function': func_info },with_env
 
     def add( self, func ):
-        func_info= self.get_function_info( func )
-        self.func_map[func.__name__]= func_info,func
+        func_info,with_env= self.get_function_info( func )
+        self.func_map[func.__name__]= func_info,with_env,func
         if self.debug_echo:
             print( 'Add: Function "%s"' % func.__name__, func.__doc__ )
         return  func
 
+    def tool( self, func= None ):
+        if func is None:
+            return  self.add
+        return  self.add( func )
+
     def select_tools( self, name_list ):
+        self.info_list= self.get_tools( name_list )
+        return  self.info_list
+
+    def get_tools( self, name_list= None ):
+        if name_list is None:
+            return  self.info_list
         tool_list= []
         for name in name_list:
             if name in self.func_map:
                 print( 'Add: Function "%s"' % name )
                 tool_list.append( self.func_map[name][0] )
-        self.info_list= tool_list
         return  tool_list
 
-    def get_tools( self ):
-        return  self.info_list
-
-    def call_func( self, func_name, args ):
+    def call_func( self, func_name, args, env= None ):
         if func_name not in self.func_map:
             return  'Function "%s" not found' % func_name
-        func_info,func= self.func_map[func_name]
+        func_info,with_env,func= self.func_map[func_name]
         try:
-            result= str(func( **args ))
+            if with_env:
+                result= str(func( env, **args ))
+            else:
+                result= str(func( **args ))
         except TypeError as e:
             return  'Argument mismatch in tool call. "%s"' % (str(e))
         if self.debug_echo:
@@ -119,20 +148,20 @@ def search_file( search_list, base_name ):
     return  base_name
 
 @tool.add
-def read_source_code( file_name:str ) -> str:
+def read_source_code( env:ToolEnv, file_name:str ) -> str:
     """
     Read a source code.
     By simply specifying the file name, you can search the Project and Engine folders and read the file content.
     """
     folder_list= []
-    folder_root= os.environ.get( 'MCP_FOLDER_ROOT', os.environ.get( 'MCP_SOURCE_ROOT', '' ) )
+    folder_root= env.get( 'MCP_FOLDER_ROOT', env.get( 'MCP_SOURCE_ROOT', '' ) )
     if folder_root != '':
         folder_list.append( folder_root )
-    project_root= os.environ.get( 'MCP_PROJECT_ROOT', '' )
+    project_root= env.get( 'MCP_PROJECT_ROOT', '' )
     if project_root != '':
         folder_list.append( os.path.join( project_root, 'Source' ) )
         folder_list.append( os.path.join( project_root, 'Plugins' ) )
-    engine_root= os.environ.get( 'MCP_ENGINE_ROOT', '' )
+    engine_root= env.get( 'MCP_ENGINE_ROOT', '' )
     if engine_root != '':
         folder_list.append( os.path.join( engine_root, 'Engine/Source' ) )
         folder_list.append( os.path.join( engine_root, 'Engine/Plugins' ) )
@@ -174,21 +203,21 @@ def search_path3( folder_list, file_name ):
     return  None
 
 @tool.add
-def read_source_code3( file_name:str ) -> str:
+def read_source_code3( env:ToolEnv, file_name:str ) -> str:
     """
     Read a source code.
     By simply specifying a partial path or filename, you can search the folders and read the file content.
     """
     folder_list= []
-    folder_root= os.environ.get( 'MCP_FOLDER_ROOT', os.environ.get( 'MCP_SOURCE_ROOT', '' ) )
+    folder_root= env.get( 'MCP_FOLDER_ROOT', env.get( 'MCP_SOURCE_ROOT', '' ) )
     if folder_root != '':
         folder_list.append( os.path.abspath( folder_root ) )
-    project_root= os.environ.get( 'MCP_PROJECT_ROOT', '' )
+    project_root= env.get( 'MCP_PROJECT_ROOT', '' )
     if project_root != '':
         project_root= os.path.abspath( project_root )
         folder_list.append( os.path.join( project_root, 'Source' ) )
         folder_list.append( os.path.join( project_root, 'Plugins' ) )
-    engine_root= os.environ.get( 'MCP_ENGINE_ROOT', '' )
+    engine_root= env.get( 'MCP_ENGINE_ROOT', '' )
     if engine_root != '':
         engine_root= os.path.abspath( engine_root )
         folder_list.append( os.path.join( engine_root, 'Engine/Source' ) )
@@ -242,7 +271,7 @@ def grep_files( folder, pat_key, filename, content ):
     return  result_text
 
 @tool.add
-def search_in_files( pattern:str, case_sensitive:bool=True, include_filenames:bool=False ) -> str:
+def search_in_files( env:ToolEnv, pattern:str, case_sensitive:bool=True, include_filenames:bool=False ) -> str:
     """
     Searches documents and file contents and returns a list of filenames of found files.
     Search patterns can use Python's regular expressions.
@@ -259,8 +288,7 @@ def search_in_files( pattern:str, case_sensitive:bool=True, include_filenames:bo
         pat_key= re.compile( pattern, flags )
     except re.error as e:
         return  str(e)
-    #folder_root= os.environ.get( 'MCP_FOLDER_ROOT', '' )
-    folder_root= os.environ.get( 'MCP_FOLDER_ROOT', os.environ.get( 'MCP_SOURCE_ROOT', '' ) )
+    folder_root= env.get( 'MCP_FOLDER_ROOT', env.get( 'MCP_SOURCE_ROOT', '' ) )
     return  grep_files( folder_root, pat_key, include_filenames, True )
 
 #------------------------------------------------------------------------------
@@ -346,3 +374,10 @@ def delete_note( note_id:int ) -> str:
     return  'Deleted: note_id=%d' % note_id
 
 #------------------------------------------------------------------------------
+
+
+if __name__=='__main__':
+    obj1= tool.get_tools(['calc_add'])
+    print( obj1 )
+
+
