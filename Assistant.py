@@ -198,7 +198,7 @@ class Assistant:
         if 'model' in input_obj:
             local_options.model= input_obj['model']
         local_options.prompt= prompt
-        local_options.set_env( self.options.env )
+        local_options.set_env( local_options.env )
         if 'env' in input_obj:
             local_options.set_env( input_obj['env'] )
         header_text= input_obj.get( 'header', local_options.header )
