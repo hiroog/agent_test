@@ -164,7 +164,7 @@ class SlackBot:
                     if True:
                         response,status_code,local_options= self.assistant.generate_text( input_obj, None, message_list )
                         local_options.tools= ''
-                        local_options.tool_env= local_options.tool_env.env
+                        local_options.tool_env= local_options.tool_env.to_dict()
                         thread_info['options']= local_options.__dict__
                         thread_info['channel']= channel
                         if status_code != 200:

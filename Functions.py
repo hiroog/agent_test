@@ -23,6 +23,9 @@ class ToolEnv:
             return  self.env[env_name]
         return  os.environ.get( env_name, defvalue )
 
+    def to_dict( self ):
+        return  self.env
+
 
 class ToolManager:
     def __init__( self ):

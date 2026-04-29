@@ -110,12 +110,12 @@ class AssistantOptions(OllamaAPI4.OllamaOptions):
 
     def copy_from( self, src ):
         super().copy_from( src )
-        self.tool_env= Functions.ToolEnv( src.tool_env.env )
+        self.tool_env= Functions.ToolEnv( src.tool_env.to_dict() )
         return  self
 
     def set_env( self, env_list ):
         for name in env_list:
-            params= name.split( '=' )
+            params= name.split( '=', 1 )
             self.tool_env.set( params[0], params[1] )
 
 #------------------------------------------------------------------------------
@@ -128,7 +128,6 @@ class Assistant:
         self.config= self.load_file( options.config_file )
         options.tools= Functions.get_tools()
         options.tools.debug_echo= options.debug_echo
-        options.tool_env= Functions.ToolEnv()
         self.options= options
         self.options.merge_params( self.config, self.MERGE_KEY_LIST )
         options.set_env( self.options.env )
