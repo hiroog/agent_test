@@ -60,21 +60,35 @@ def _max_depth():
 
 @Functions.tool.add
 def run_subagent( prompt: str, preset: str ) -> str:
-    """Delegate a task to a sub-agent. The sub-agent runs with its own preset
-    (different model / tools / system prompt) and returns only its final response,
-    so the parent's context is not polluted.
+    """Delegate a task to a sub-agent that has its own model, tools, and context.
+    Only the sub-agent's final response is returned to you; its intermediate
+    tool outputs (large web pages, long Slack threads, multi-step tool chatter)
+    never enter your context.
 
-    Use this for: fetching and summarizing large web pages, summarizing long
-    Slack threads, or any task whose intermediate tool outputs would consume
-    excessive context. Do NOT use for short or trivial tasks.
+    When this saves context (use):
+      - The sub-agent fetches data with ITS OWN tools
+        (web_fetch, get_thread_messages, ...).
+      - The task needs multiple tool round-trips whose intermediate results
+        would clutter your context.
+
+    When this does NOT save context (do not use):
+      - You already have the text in your context and just want it shorter.
+        You already paid the token cost; the sub-agent only adds latency.
+      - The task is short / single-turn and does not invoke tools.
+
+    `prompt` is a TASK INSTRUCTION, not the content itself.
+      Good: "Fetch https://example.com/large-page and list 5 key points"
+      Good: "Summarize Slack thread channel=C123 ts=1700000000.0"
+      Bad : "<long pre-fetched text>\\nSummarize this"
 
     Args:
-        prompt: task description for the sub-agent
-                (e.g., "Fetch https://example.com/large-page and list 5 key points")
+        prompt: task description for the sub-agent (short instruction, not data)
         preset: sub-agent preset name from config.txt; pass "" to use 'subagent'
     """
     if not prompt:
         return  'prompt is empty'
+    #if not preset:
+    #    return  'preset is required; specify a sub-agent preset name from config.txt'
     depth= _get_depth()
     max_depth= _max_depth()
     if depth >= max_depth:

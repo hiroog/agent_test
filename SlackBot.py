@@ -5,6 +5,7 @@ import sys
 import os
 import threading
 import time
+import math
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
@@ -124,7 +125,7 @@ class SlackBotOptions(Assistant.AssistantOptions):
 
 # thread_info
 # {
-#     "thread_id": "thread_ts",
+#     "thread_id": "slack_thread_ts",
 #     "date": "DATE",
 #     "mtime": "MTIME",
 #     "msg_id": "GUID",
@@ -148,15 +149,13 @@ class SlackBot:
     #--------------------------------------------------------------------------
     # Assistant API
 
-    def bot( self, thread_id, prompt, msg_id, channel ):
+    def bot( self, thread_id, prompt, msg_id, msg_info ):
         with ExecTime( 'Generate' ):
             thread_info,thread_lock= self.thread_cache.get_thread_info( thread_id )
             with thread_lock:
                 thread_info['mtime']= ExecTime().get_date()
                 thread_info['msg_id']= msg_id
                 message_list= thread_info['message_list']
-                #if message_list == []:
-                #    prompt= 'channel=%s thread_ts=%s channel-date=%s\n\n%s' % (channel, thread_id, self.format_ts(thread_id), prompt)
                 input_obj= {
                     'prompt': prompt,
                 }
@@ -166,7 +165,7 @@ class SlackBot:
                         local_options.tools= ''
                         local_options.tool_env= local_options.tool_env.to_dict()
                         thread_info['options']= local_options.__dict__
-                        thread_info['channel']= channel
+                        thread_info['msg_info']= msg_info
                         if status_code != 200:
                             response= '\nserver error: %d\n' % status_code
                     else:
@@ -175,12 +174,32 @@ class SlackBot:
                     self.thread_cache.save_thread_0( thread_id )
         return  response
 
+    #--------------------------------------------------------------------------
+    # Debug CLI
+
+    def cli_thread( self ):
+        t= time.time()
+        thread_id= time.strftime( 'cli_%Y%m%d_%H%M%S', time.localtime(t) )
+        f= t-math.floor(t)
+        thread_id+= '_%07d' % ((int)(f * 10000000))
+        print( thread_id )
+        while True:
+            print( 'Robo> ', end='' )
+            line= input()
+            result= self.bot( thread_id, line, '', {} )
+            print( '****************' )
+            print( result )
+            print( '****************' )
+
 
     #--------------------------------------------------------------------------
     # Slack API
 
-    def get_thread_id( self, message ):
+    def get_thread_ts( self, message ):
         return  message.get( 'thread_ts' ) or message.get( 'ts' )
+
+    def get_thread_id( self, message ):
+        return  'slack_' + self.get_thread_ts( message )
 
     def send_message( self, say, thread_id, message, client ):
         msg_id= message.get( 'client_msg_id', '' )
@@ -188,6 +207,8 @@ class SlackBot:
         # すでに返答済み
         if self.thread_cache.has_message( thread_id, msg_id ):
             return
+
+        thread_ts= self.get_thread_ts( message )
 
         # Reaction Mark
         channel= message.get( 'channel', '' )
@@ -203,7 +224,12 @@ class SlackBot:
         tsstr= _format_ts( ts )
         prompt= f'{tsstr} {user}: {text}'
 
-        reply_text= self.bot( thread_id, prompt, msg_id, channel )
+        msg_info= {
+            'channel': channel,
+            'thread_ts': thread_ts,
+        }
+
+        reply_text= self.bot( thread_id, prompt, msg_id, msg_info )
         say( text=reply_text, thread_ts=thread_id, blocks= [
                 {
                     'type': 'markdown',
@@ -230,9 +256,9 @@ class SlackBot:
 
     def event_message( self, message, say, logger, client ):
         if self.options.debug_echo:
-            print( '$$$$$$$<message>' )
+            print( '$$$$$$<message>' )
             print( message )
-            print( '$$$$$$$<message>' )
+            print( '$$$$$$<message>' )
 
         # DM は無視, Channel のみ
         if message.get('channel_type') == 'im':
@@ -266,6 +292,17 @@ def handle_message( message, say, logger, client ):
     global slack_bot
     slack_bot.event_message( message, say, logger, client )
 
+def handle_message_events( body, logger ):
+    message_type= body.get( 'type', '' )    # event_callback
+    event= body.get( 'event', {} )
+    event_type= event.get( 'type', '' )     # message
+    subtype= event.get( 'subtype', '' )     # message_deleted/message_changed/bot_message
+    channel= event.get( 'channel', '' )     # C0
+    ts= event.get( 'ts', '' )
+    text= f'receved {message_type} {event_type} {subtype} {channel} {ts}'
+    print( text )
+    logger.info( text )
+
 
 #------------------------------------------------------------------------------
 
@@ -282,6 +319,7 @@ def usage():
 def main( argv ):
     acount= len(argv)
     options= SlackBotOptions()
+    options.cli= False
     ai= 1
     while ai < acount:
         arg= argv[ai]
@@ -294,6 +332,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'prompt_dir' )
             elif arg == '--print':
                 options.print= True
+            elif arg == '--cli':
+                options.cli= True
             elif arg == '--debug':
                 options.debug_echo= True
             else:
@@ -306,9 +346,14 @@ def main( argv ):
     global slack_bot
     slack_bot= SlackBot( SlackBotOptions() )
 
+    if options.cli:
+        slack_bot.cli_thread()
+        return  0
+
     app= App( token= os.environ.get('SLACK_BOT_TOKEN', os.environ.get('SLACK_API_TOKEN')) )
     app.event('app_mention')( ack=respound_within_3_seconds, lazy=[handle_app_mention_events] )
     app.message()(ack=respound_within_3_seconds, lazy=[handle_message])
+    app.event('message')(ack=respound_within_3_seconds, lazy=[handle_message_events])
     handler= SocketModeHandler( app, os.environ['SLACK_APP_TOKEN'] )
     handler.start()
 

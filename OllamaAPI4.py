@@ -259,7 +259,9 @@ class OllamaAPI:
             role= message['role']
             if role == 'assistant':
                 if 'content' in message:
-                    response+= message['content'] + '\n'
+                    content= message['content']
+                    if content.strip() != '':
+                        response+= content + '\n'
                 tool_calls= message.get( 'tool_calls', None )
                 if tool_calls:
                     for tool_call in tool_calls:
@@ -280,7 +282,7 @@ class OllamaAPI:
                             }
                         message_list.append( message )
                         if options.response_all:
-                            response+= 'toolcall: %s\n' % func_name
+                            response+= ':wrench: toolcall: %s\n' % func_name
                     continue
                 if not options.response_all:
                     response= message.get( 'content', response )
