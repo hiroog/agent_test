@@ -9,7 +9,7 @@ USE_TEST04=1
 USE_TEST05=1
 USE_TEST10=1
 USE_ASSISTANT1=1
-USE_CPPREVIEW=0
+USE_CPPREVIEW=1
 USE_SLACKBOT=0
 
 #------------------------------------------------------------------------------

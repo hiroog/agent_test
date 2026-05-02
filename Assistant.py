@@ -126,7 +126,7 @@ class Assistant:
 
     def __init__( self, options ):
         self.config= self.load_file( options.config_file )
-        options.tools= Functions.get_tools()
+        options.tools= Functions.get_toolbox()
         options.tools.debug_echo= options.debug_echo
         self.options= options
         self.options.merge_params( self.config, self.MERGE_KEY_LIST )
@@ -173,8 +173,10 @@ class Assistant:
                 local_options.merge_params( preset, self.MERGE_KEY_LIST )
                 if local_options.tools:
                     local_options.tool_info_list= local_options.tools.get_tools( preset.get('tools') )
+                if 'include_system' in preset:
+                    local_options.system_prompt= self.load_prompt( preset['include_system'], local_options.base_prompt )
                 if 'include_prompt' in preset:
-                    local_options.base_prompt= self.load_prompt( preset['include_prompt'], None )
+                    local_options.base_prompt= self.load_prompt( preset['include_prompt'], local_options.system_prompt )
         return  local_options
 
     #--------------------------------------------------------------------------

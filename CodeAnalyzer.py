@@ -10,7 +10,7 @@ if lib_path not in sys.path:
     sys.path.append( lib_path )
 import Assistant
 import FileListLib
-import Functions
+from Functions import get_toolbox
 import TextLoader
 import SlackAPI
 from OllamaAPI4 import OptionBase, ExecTime
@@ -52,7 +52,9 @@ class IssueList:
 
 issue_list= IssueList()
 
-@Functions.tool.add
+mcp= get_toolbox()
+
+@mcp.tool()
 def create_issue( title:str, description:str, file_name:str ) -> str:
     """Add a new issue to the bug tracking system.
 

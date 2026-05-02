@@ -18,7 +18,7 @@ import fnmatch
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
-import Functions
+from Functions import get_toolbox,ToolEnv
 from SlackAPI import SlackAPI
 from slack_sdk.errors import SlackApiError
 
@@ -77,7 +77,9 @@ def _quote_body( text ):
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
+mcp= get_toolbox()
+
+@mcp.tool()
 def list_slack_channels( name_pattern: str ) -> str:
     """
     List public Slack channels. Returns channel names.
@@ -110,7 +112,7 @@ def list_slack_channels( name_pattern: str ) -> str:
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
+@mcp.tool()
 def get_channel_messages( channel: str, hours: int, max_count: int ) -> str:
     """
     Retrieve recent top-level messages from a Slack channel within the last N hours.
@@ -162,7 +164,7 @@ def get_channel_messages( channel: str, hours: int, max_count: int ) -> str:
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
+@mcp.tool()
 def get_thread_messages( channel: str, thread_ts: str, max_count: int ) -> str:
     """
     Retrieve replies in a Slack thread. Use the thread_ts returned by get_channel_messages.
@@ -203,7 +205,7 @@ def get_thread_messages( channel: str, thread_ts: str, max_count: int ) -> str:
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
+@mcp.tool()
 def lookup_slack_user( user_id: str ) -> str:
     """
     Look up user information by user_id. Use this to resolve "<@U012345>" mentions seen
@@ -232,7 +234,7 @@ def lookup_slack_user( user_id: str ) -> str:
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
+@mcp.tool()
 def resolve_slack_user_id( name: str ) -> str:
     """
     Look up Slack user_id values by display name, real name, or username (substring match, case-insensitive).
@@ -277,7 +279,7 @@ def resolve_slack_user_id( name: str ) -> str:
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
+@mcp.tool()
 def post_slack_message( channel: str, text: str, thread_ts: str ) -> str:
     """
     Post a message to a Slack channel. Use thread_ts to reply within an existing thread,

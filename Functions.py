@@ -27,7 +27,7 @@ class ToolEnv:
         return  self.env
 
 
-class ToolManager:
+class ToolBox:
     def __init__( self ):
         self.info_list= []
         self.func_map= {}
@@ -116,19 +116,19 @@ class ToolManager:
                 print( 'Call: %s(%s) result=%d chars' % (func_name,str(args),len(result)), flush=True )
         return  result
 
-tool= ToolManager()
+mcp= ToolBox()
 
-def get_tools():
-    return  tool
+def get_toolbox():
+    return  mcp
 
 #------------------------------------------------------------------------------
 
-@tool.add
+@mcp.tool()
 def calc_add( a: int, b: int ) -> int:
     """Add two numbers"""
     return  a + b
 
-@tool.add
+@mcp.tool()
 def get_weather( city:str ) -> str:
     """Get the weather"""
     return  ['晴れ','雨','雷雨','曇り','雪','曇のち晴れ'][random.randrange(0,6)]
@@ -150,7 +150,7 @@ def search_file( search_list, base_name ):
             return  result
     return  base_name
 
-@tool.add
+@mcp.tool()
 def read_source_code( env:ToolEnv, file_name:str ) -> str:
     """
     Read a source code.
@@ -205,7 +205,7 @@ def search_path3( folder_list, file_name ):
             return  result
     return  None
 
-@tool.add
+@mcp.tool()
 def read_source_code3( env:ToolEnv, file_name:str ) -> str:
     """
     Read a source code.
@@ -273,7 +273,7 @@ def grep_files( folder, pat_key, filename, content ):
         result_text= 'File not found\n\n'
     return  result_text
 
-@tool.add
+@mcp.tool()
 def search_in_files( env:ToolEnv, pattern:str, case_sensitive:bool=True, include_filenames:bool=False ) -> str:
     """
     Searches documents and file contents and returns a list of filenames of found files.
@@ -296,7 +296,7 @@ def search_in_files( env:ToolEnv, pattern:str, case_sensitive:bool=True, include
 
 #------------------------------------------------------------------------------
 
-@tool.add
+@mcp.tool()
 def get_current_datetime() -> str:
     """
     Returns the current date and time in the format YYYY-MM-DD HH:MM:SS."
@@ -325,7 +325,7 @@ class LocalMemory:
 
 local_memory= LocalMemory()
 
-@tool.add
+@mcp.tool()
 def add_note( title:str, content:str ) -> str:
     """
     Adds a note with the given title and content to retain critical information.
@@ -340,7 +340,7 @@ def add_note( title:str, content:str ) -> str:
     note_id= local_memory.append( title, content )
     return  'Added: ntoe_id=%d' % note_id
 
-@tool.add
+@mcp.tool()
 def get_note( ntoe_id:int ) -> str:
     """
     Retrieves a note by its unique ID.
@@ -352,7 +352,7 @@ def get_note( ntoe_id:int ) -> str:
     _,title,content= local_memory.get_memory( note_id )
     return  '# ' + title + '\n\n' + content + '\n'
 
-@tool.add
+@mcp.tool()
 def get_note_list() -> str:
     """
     Returns a list of note entries with their ids and titles.
@@ -364,7 +364,7 @@ def get_note_list() -> str:
             result+= '- %d : %s\n' % (note[0],note[1])
     return  result
 
-@tool.add
+@mcp.tool()
 def delete_note( note_id:int ) -> str:
     """
     Deletes a note by its id.

@@ -5,7 +5,6 @@ import sys
 import os
 import threading
 import time
-import math
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
@@ -115,9 +114,6 @@ class SlackBotOptions(Assistant.AssistantOptions):
     def __init__( self, **args ):
         super().__init__()
         self.preset= 'chatbot'
-        self.debug_echo= True
-        self.response_all= True
-        #---------------------------
         self.apply_params( args )
 
 
@@ -173,24 +169,6 @@ class SlackBot:
                 finally:
                     self.thread_cache.save_thread_0( thread_id )
         return  response
-
-    #--------------------------------------------------------------------------
-    # Debug CLI
-
-    def cli_thread( self ):
-        t= time.time()
-        thread_id= time.strftime( 'cli_%Y%m%d_%H%M%S', time.localtime(t) )
-        f= t-math.floor(t)
-        thread_id+= '_%07d' % ((int)(f * 10000000))
-        print( thread_id )
-        while True:
-            print( 'Robo> ', end='' )
-            line= input()
-            result= self.bot( thread_id, line, '', {} )
-            print( '****************' )
-            print( result )
-            print( '****************' )
-
 
     #--------------------------------------------------------------------------
     # Slack API
@@ -313,6 +291,8 @@ def usage():
     print( '  --preset <preset>             default: chatbot' )
     print( '  --config <config_file>        default: config.txt' )
     print( '  --prompt_dir <dir>' )
+    print( '  --print' )
+    print( '  --debug' )
     sys.exit( 1 )
 
 
@@ -332,8 +312,6 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'prompt_dir' )
             elif arg == '--print':
                 options.print= True
-            elif arg == '--cli':
-                options.cli= True
             elif arg == '--debug':
                 options.debug_echo= True
             else:
@@ -344,7 +322,7 @@ def main( argv ):
             usage()
 
     global slack_bot
-    slack_bot= SlackBot( SlackBotOptions() )
+    slack_bot= SlackBot( options )
 
     if options.cli:
         slack_bot.cli_thread()

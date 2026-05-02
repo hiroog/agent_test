@@ -19,7 +19,7 @@ import threading
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
-import Functions
+from Functions import get_toolbox,ToolEnv
 import Assistant
 
 _DEFAULT_MAX_DEPTH= 2
@@ -57,8 +57,9 @@ def _max_depth():
     except ValueError:
         return  _DEFAULT_MAX_DEPTH
 
+mcp= get_toolbox()
 
-@Functions.tool.add
+@mcp.tool()
 def run_subagent( prompt: str, preset: str ) -> str:
     """Delegate a task to a sub-agent that has its own model, tools, and context.
     Only the sub-agent's final response is returned to you; its intermediate

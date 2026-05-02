@@ -17,11 +17,12 @@ pytee.py
 sample*.txt
 *.bak
 *.swp
-old
-/src
+/old/
+/src/
 /threads/
 /botenv/
 /web/
 /docs/
 /analyzer_stat.json
 /webfetch_whitelist.txt
+/local/

@@ -11,14 +11,15 @@ lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
 import Functions
+from Functions import get_toolbox,ToolEnv
 
 _RG= shutil.which( 'rg' )
 _SKIP_DIRS= frozenset( ['.git', '__pycache__', 'Intermediate', 'Binaries', 'DerivedDataCache', 'Saved'] )
 _MAX_LIST= 500
 _MAX_SEARCH= 500
 
-def _get_root():
-    return os.environ.get( 'MCP_FOLDER_ROOT', os.environ.get( 'MCP_SOURCE_ROOT', '' ) )
+def _get_root( env ):
+    return env.get( 'MCP_FOLDER_ROOT', env.get( 'MCP_SOURCE_ROOT', '' ) )
 
 def _validate_path( root, rel_path ):
     abs_root= os.path.realpath( root )
@@ -76,8 +77,10 @@ def _list_files_impl( directory, ext_set, recursive ):
     scan( directory )
     return results, truncated[0]
 
-@Functions.tool.add
-def list_files( directory: str, extension: str, recursive: bool ) -> str:
+mcp= get_toolbox()
+
+@mcp.tool()
+def list_files( env:ToolEnv, directory: str, extension: str, recursive: bool ) -> str:
     """
     List files in the specified directory within the source root.
 
@@ -86,7 +89,7 @@ def list_files( directory: str, extension: str, recursive: bool ) -> str:
         extension: Comma-separated extensions to filter, e.g. ".cpp,.h". Use empty string for all files.
         recursive: If true, list files in subdirectories recursively.
     """
-    root= _get_root()
+    root= _get_root( env )
     if not root:
         return 'MCP_FOLDER_ROOT is not set'
     target= _validate_path( root, directory )
@@ -153,8 +156,8 @@ def _python_search( pattern, root, target, ext_set, case_sensitive, cap ):
                 continue
     return results, False
 
-@Functions.tool.add
-def search_text( pattern: str, directory: str, extension: str, case_sensitive: bool, max_results: int ) -> str:
+@mcp.tool()
+def search_text( env:ToolEnv, pattern: str, directory: str, extension: str, case_sensitive: bool, max_results: int ) -> str:
     """
     Search for text patterns in source files and return matching lines with file paths and line numbers.
     Uses ripgrep if installed for fast searching, otherwise falls back to a Python implementation.
@@ -167,7 +170,7 @@ def search_text( pattern: str, directory: str, extension: str, case_sensitive: b
         case_sensitive: Set to false to ignore case.
         max_results: Maximum number of matching lines to return. Recommended: 50-200.
     """
-    root= _get_root()
+    root= _get_root( env )
     if not root:
         return 'MCP_FOLDER_ROOT is not set'
     target= _validate_path( root, directory )
@@ -207,8 +210,8 @@ def _resolve_file( root, file_path ):
                 return os.path.join( dirpath, name )
     return None
 
-@Functions.tool.add
-def read_file_range( file_path: str, start_line: int, line_count: int ) -> str:
+@mcp.tool()
+def read_file_range( env:ToolEnv, file_path: str, start_line: int, line_count: int ) -> str:
     """
     Read a range of lines from a source file with line numbers.
     Can locate files by filename alone, partial path, or full path relative to the source root.
@@ -220,7 +223,7 @@ def read_file_range( file_path: str, start_line: int, line_count: int ) -> str:
         start_line: First line to read (1-based). Use 1 to start from the beginning.
         line_count: Number of lines to read. Use 0 to read the entire file.
     """
-    root= _get_root()
+    root= _get_root( env )
     if not root:
         return 'MCP_FOLDER_ROOT is not set'
     full= _resolve_file( root, file_path )
@@ -241,8 +244,8 @@ def read_file_range( file_path: str, start_line: int, line_count: int ) -> str:
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
-def find_files( name_pattern: str, directory: str ) -> str:
+@mcp.tool()
+def find_files( env:ToolEnv, name_pattern: str, directory: str ) -> str:
     """
     Find files by filename pattern. Supports wildcards (* matches any characters, ? matches one character).
     Returns paths relative to the source root.
@@ -251,7 +254,7 @@ def find_files( name_pattern: str, directory: str ) -> str:
         name_pattern: Filename pattern with optional wildcards. e.g. "*DebugMenu*", "*.Build.cs", "Player*.h"
         directory: Relative path from the source root to search in. Use empty string to search all.
     """
-    root= _get_root()
+    root= _get_root( env )
     if not root:
         return 'MCP_FOLDER_ROOT is not set'
     target= _validate_path( root, directory )

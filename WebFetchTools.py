@@ -27,7 +27,7 @@ import requests
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
-import Functions
+from Functions import get_toolbox,ToolEnv
 
 _MAX_BYTES= 5 * 1024 * 1024
 _TIMEOUT= ( 5, 15 )
@@ -260,7 +260,9 @@ def _slice_response( url, status, content_type, text, start, max_chars, method_l
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
+mcp= get_toolbox()
+
+@mcp.tool()
 def web_fetch( url: str, max_chars: int ) -> str:
     """
     Fetch the content of a URL via HTTP GET. Only whitelisted hosts may be fetched;
@@ -284,7 +286,7 @@ def web_fetch( url: str, max_chars: int ) -> str:
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
+@mcp.tool()
 def web_fetch_range( url: str, start_char: int, max_chars: int ) -> str:
     """
     Read a character range from a previously fetched URL's cached response body.
@@ -304,7 +306,7 @@ def web_fetch_range( url: str, start_char: int, max_chars: int ) -> str:
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
+@mcp.tool()
 def web_post_json( url: str, json_body: str, max_chars: int ) -> str:
     """
     POST a JSON body to a URL. Same whitelist and DNS-pin enforcement as web_fetch.
@@ -328,7 +330,7 @@ def web_post_json( url: str, json_body: str, max_chars: int ) -> str:
 
 #------------------------------------------------------------------------------
 
-@Functions.tool.add
+@mcp.tool()
 def list_web_whitelist() -> str:
     """
     List the hosts that web_fetch / web_post_json are permitted to access.
