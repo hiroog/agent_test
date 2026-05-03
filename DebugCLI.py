@@ -28,7 +28,7 @@ class SlackCLI:
         t= time.time()
         thread_id= time.strftime( 'cli_%Y%m%d_%H%M%S', time.localtime(t) )
         f= t-math.floor(t)
-        thread_id+= '_%07d' % ((int)(f * 10000000))
+        thread_id+= '_%06d' % ((int)(f * 1000000))
         return  thread_id
 
     def bot_single( self, thread_id, prompt ):

@@ -72,11 +72,16 @@ class ThreadCache:
             os.mkdir( self.THREAD_CACHE_DIR )
 
     def get_thread_file_name( self, thread_id ):
-        return  os.path.join( self.THREAD_CACHE_DIR, thread_id + '.json' )
+        params= thread_id.split( '_' )
+        return  os.path.join( self.THREAD_CACHE_DIR, params[0]+'_'+params[1], thread_id + '.json' )
 
     def save_thread_0( self, thread_id ):
         if thread_id in self.thread_map:
-            save_json( self.get_thread_file_name( thread_id ), self.thread_map[thread_id] )
+            save_file_name= self.get_thread_file_name( thread_id )
+            p,_= os.path.split( save_file_name )
+            if not os.path.exists( p ):
+                os.makedirs( p )
+            save_json( save_file_name, self.thread_map[thread_id] )
 
     def has_thread_0( self, thread_id ):
         if thread_id in self.thread_map:
@@ -130,13 +135,6 @@ class SlackBotOptions(Assistant.AssistantOptions):
 #     "queue": []
 # }
 
-def _format_ts( ts ):
-    try:
-        t= float( ts )
-    except (TypeError, ValueError):
-        return ts
-    return time.strftime( '%Y-%m-%d %H:%M:%S', time.localtime( t ) )
-
 class SlackBot:
     def __init__( self, options ):
         self.options= options
@@ -178,11 +176,25 @@ class SlackBot:
     #--------------------------------------------------------------------------
     # Slack API
 
+    def ts_to_local_time( self, ts ):
+        try:
+            t= float( ts )
+        except (TypeError, ValueError):
+            return  time.localtime()
+        return  time.localtime( t )
+
     def get_thread_ts( self, message ):
         return  message.get( 'thread_ts' ) or message.get( 'ts' )
 
+    def get_thread_id_0( self, ts ):
+        params= ts.split( '.' )
+        thread_id= time.strftime( 'slack_%Y%m%d_%H%M%S', self.ts_to_local_time( params[0] ) )
+        thread_id+= '_' + params[1]
+        print( '*************', thread_id )
+        return  thread_id
+
     def get_thread_id( self, message ):
-        return  'slack_' + self.get_thread_ts( message )
+        return  self.get_thread_id_0( self.get_thread_ts( message ) )
 
     def send_message( self, say, thread_id, message, client ):
         msg_id= message.get( 'client_msg_id', '' )
@@ -204,7 +216,7 @@ class SlackBot:
 
         text= message.get( 'text', '' )
         user= message.get( 'user', '' )
-        tsstr= _format_ts( ts )
+        tsstr= time.strftime( '%Y-%m-%d %H:%M:%S', self.ts_to_local_time( ts ) )
         prompt= f'{tsstr} {user}: {text}'
 
         msg_info= {
@@ -213,7 +225,7 @@ class SlackBot:
         }
 
         reply_text= self.bot( thread_id, prompt, msg_id, msg_info )
-        say( text=reply_text, thread_ts=thread_id, blocks= [
+        say( text=reply_text, thread_ts=thread_ts, blocks= [
                 {
                     'type': 'markdown',
                     'text': reply_text

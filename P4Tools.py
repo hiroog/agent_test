@@ -14,6 +14,7 @@ import re
 import sys
 import time
 import threading
+import signal
 
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
@@ -21,6 +22,8 @@ if lib_path not in sys.path:
 from Functions import get_toolbox,ToolEnv
 
 from P4 import P4, P4Exception
+
+signal.signal( signal.SIGINT, signal.default_int_handler )
 
 _MAX_CHANGES= 200
 _MAX_FILES= 500
@@ -110,7 +113,7 @@ def p4_recent_changes( path: str, max_count: int, user_filter: str ) -> str:
 
     Args:
         path: Depot path with wildcard, e.g. "//depot/proj/...", "//depot/proj/Source/...",
-              "//depot/proj/Content/...". Use empty string to use PF_DEFAULT_PATH.
+              "//depot/proj/Content/...", "//depot/proj/....cpp". Use empty string to use PF_DEFAULT_PATH.
         max_count: Maximum number of changelists to return. Recommended 10-50, max 200.
         user_filter: If non-empty, only return changes submitted by this user. Use empty string for all users.
     """
@@ -120,6 +123,10 @@ def p4_recent_changes( path: str, max_count: int, user_filter: str ) -> str:
     target= _resolve_path( path )
     if not target:
         return 'No path specified and PF_DEFAULT_PATH is not set'
+    if target[-1] == '/':
+        target+= '...'
+    elif '...' not in target:
+        target+= '/...'
     n= max( 1, min( max_count, _MAX_CHANGES ) )
     args= ['changes', '-m', str( n ), '-l', '-s', 'submitted']
     if user_filter:
@@ -202,6 +209,10 @@ def p4_search_changes( path: str, message_pattern: str, scan_count: int ) -> str
     target= _resolve_path( path )
     if not target:
         return 'No path specified and PF_DEFAULT_PATH is not set'
+    if target[-1] == '/':
+        target+= '...'
+    elif '...' not in target:
+        target+= '/...'
     if not message_pattern:
         return 'message_pattern must not be empty'
     try:
