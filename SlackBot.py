@@ -296,6 +296,9 @@ def usage():
     print( '  --preset <preset>             default: chatbot' )
     print( '  --config <config_file>        default: config.txt' )
     print( '  --prompt_dir <dir>' )
+    print( '  --provider <provider>' )
+    print( '  --host <base_url>' )
+    print( '  --model <model>' )
     print( '  --print' )
     print( '  --debug' )
     sys.exit( 1 )
@@ -304,7 +307,6 @@ def usage():
 def main( argv ):
     acount= len(argv)
     options= SlackBotOptions()
-    options.cli= False
     ai= 1
     while ai < acount:
         arg= argv[ai]
@@ -315,6 +317,12 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'config_file' )
             elif arg == '--prompt_dir':
                 ai= options.set_str( ai, argv, 'prompt_dir' )
+            elif arg == '--provider':
+                ai= options.set_str( ai, argv, 'provider' )
+            elif arg == '--host':
+                ai= options.set_str( ai, argv, 'base_url' )
+            elif arg == '--model':
+                ai= options.set_str( ai, argv, 'model' )
             elif arg == '--print':
                 options.print= True
             elif arg == '--debug':
@@ -328,10 +336,6 @@ def main( argv ):
 
     global slack_bot
     slack_bot= SlackBot( options )
-
-    if options.cli:
-        slack_bot.cli_thread()
-        return  0
 
     app= App( token= os.environ.get('SLACK_BOT_TOKEN', os.environ.get('SLACK_API_TOKEN')) )
     app.event('app_mention')( ack=respound_within_3_seconds, lazy=[handle_app_mention_events] )

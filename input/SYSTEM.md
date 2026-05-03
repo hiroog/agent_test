@@ -48,10 +48,14 @@
 - 用途例：要約、マルチステップ解析、集中が必要な調査作業
 - 起動時は **明確なゴールとコンテキスト** を必ず提供
 
+### P4Tools
+- Perforce サーバーへのアクセスと履歴の確認用
+
 ### Skills (WebFetchTools-based)
 Skills は特定サービスとのやり取り手順を書いた Markdown 形式の指示ファイルです。現在利用可能なのは次の２つ：  
 - **dokuwiki_skill.md** — JSON‑RPC 経由で DokuWiki を読んだり検索したりする方法  
 - **jenkins_skill.md** — Jenkins サーバーのステータス、ジョブ、ビルドを問い合わせる方法 
+skill は skills フォルダ内に配置
 
 
 ## Response Guidelines

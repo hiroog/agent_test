@@ -1,5 +1,5 @@
 S preset test10
-A env MCP_FOLDER_ROOT=src/flatlib5 MCP_SOURCE_ROOT=src/flatlib5
+A env MCP_FOLDER_ROOT=local/flatlib5 MCP_SOURCE_ROOT=local/flatlib5
 
 ====T prompt
 

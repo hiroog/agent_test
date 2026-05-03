@@ -10,7 +10,7 @@ USE_TEST05=1
 USE_TEST10=1
 USE_ASSISTANT1=1
 USE_CPPREVIEW=1
-USE_SLACKBOT=0
+USE_SLACKBOT=1
 
 #------------------------------------------------------------------------------
 
@@ -55,7 +55,7 @@ fi
 
 # complex tool calling
 if [ $USE_TEST10 = 1 ];then
-  if [ -e src/flatlib5 ];then
+  if [ -e local/flatlib5 ];then
 python3 Assistant.py $BASE_OPTIONS --preset test10 --input input/test10.txt --print --debug
   fi
 fi
@@ -82,12 +82,10 @@ fi
 #------------------------------------------------------------------------------
 
 if [ $USE_SLACKBOT = 1 ];then
-if [ $USE_SLACK = 1 ];then
   if [ "$SLACK_BOT_TOKEN" != "" ];then
     if [ "$SLACK_APP_TOKEN" != "" ];then
-python3 SlackBot.py --config $CONFIG_FILE --print --debug
+python3 DebugCLI.py --config $CONFIG_FILE --print --debug --text "jenkinsの状態を見たい"
     fi
   fi
-fi
 fi
 
