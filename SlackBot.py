@@ -145,6 +145,10 @@ class SlackBot:
     #--------------------------------------------------------------------------
     # Assistant API
 
+        # thread_id = スレッド(セッション)を識別できる固有文字列 (必須)
+        # prompt = ユーザー入力 (必須)
+        # msg_id = 同一メッセージかどうか判定する場合のみ必要。不要なら ''
+        # msg_info = スレッド(セッション)ログに記録したい情報。不要なら {}
     def bot( self, thread_id, prompt, msg_id, msg_info ):
         with ExecTime( 'Generate' ):
             thread_info,thread_lock= self.thread_cache.get_thread_info( thread_id )

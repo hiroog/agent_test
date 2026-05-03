@@ -174,9 +174,9 @@ class Assistant:
                 if local_options.tools:
                     local_options.tool_info_list= local_options.tools.get_tools( preset.get('tools') )
                 if 'include_system' in preset:
-                    local_options.system_prompt= self.load_prompt( preset['include_system'], local_options.base_prompt )
+                    local_options.system_prompt= self.load_prompt( preset['include_system'], local_options.system_prompt )
                 if 'include_prompt' in preset:
-                    local_options.base_prompt= self.load_prompt( preset['include_prompt'], local_options.system_prompt )
+                    local_options.base_prompt= self.load_prompt( preset['include_prompt'], local_options.base_prompt )
         return  local_options
 
     #--------------------------------------------------------------------------

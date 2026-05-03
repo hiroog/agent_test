@@ -34,7 +34,8 @@ class SlackCLI:
             print( 'Robo> ', end='' )
             line= input()
             if line.strip() != '':
-                result= self.bot.bot( thread_id, line, '', {} )
+                prompt= 'USER: ' + line
+                result= self.bot.bot( thread_id, prompt, '', {} )
                 print( '\U0001f916 ****************' )
                 print( result )
                 print( '*******************' )
