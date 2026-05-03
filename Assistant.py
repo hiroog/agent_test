@@ -165,7 +165,7 @@ class Assistant:
             return  prompt
         return  base_prompt
 
-    def load_preset2( self, preset_name ):
+    def load_preset2( self, preset_name, load_prompt ):
         local_options= AssistantOptions().copy_from( self.options )
         if self.config:
             if preset_name in self.config:
@@ -173,10 +173,11 @@ class Assistant:
                 local_options.merge_params( preset, self.MERGE_KEY_LIST )
                 if local_options.tools:
                     local_options.tool_info_list= local_options.tools.get_tools( preset.get('tools') )
-                if 'include_system' in preset:
-                    local_options.system_prompt= self.load_prompt( preset['include_system'], local_options.system_prompt )
-                if 'include_prompt' in preset:
-                    local_options.base_prompt= self.load_prompt( preset['include_prompt'], local_options.base_prompt )
+                if load_prompt:
+                    if 'include_system' in preset:
+                        local_options.system_prompt= self.load_prompt( preset['include_system'], local_options.system_prompt )
+                    if 'include_prompt' in preset:
+                        local_options.base_prompt= self.load_prompt( preset['include_prompt'], local_options.base_prompt )
         return  local_options
 
     #--------------------------------------------------------------------------
@@ -186,10 +187,11 @@ class Assistant:
             message_list= []
         if preset_name is None:
             preset_name= input_obj.get( 'preset', self.options.preset )
-        local_options= self.load_preset2( preset_name )
         prompt= input_obj['prompt']
         system= input_obj.get( 'system', None )
-        if message_list == []:
+        is_root= message_list == []
+        local_options= self.load_preset2( preset_name, is_root )
+        if is_root:
             if local_options.base_prompt:
                 prompt= local_options.base_prompt + '\n' + prompt
             if local_options.system_prompt:

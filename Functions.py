@@ -94,7 +94,8 @@ class ToolBox:
         tool_list= []
         for name in name_list:
             if name in self.func_map:
-                print( 'Add: Function "%s"' % name )
+                if self.debug_echo:
+                    print( 'Add: Function "%s"' % name )
                 tool_list.append( self.func_map[name][0] )
         return  tool_list
 

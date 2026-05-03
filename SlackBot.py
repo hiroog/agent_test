@@ -114,6 +114,7 @@ class SlackBotOptions(Assistant.AssistantOptions):
     def __init__( self, **args ):
         super().__init__()
         self.preset= 'chatbot'
+        self.response_all= True
         self.apply_params( args )
 
 

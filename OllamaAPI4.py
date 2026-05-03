@@ -271,9 +271,8 @@ class OllamaAPI:
                         arguments= json.loads(function['arguments'])
                         data= ''
                         if tools:
+                            print( '**TOOLCALL**:', func_name, arguments, flush=True )
                             data= tools.call_func( func_name, arguments, options.tool_env )
-                        #if options.debug_echo:
-                        #    print( '**TOOL**', data, flush=True )
                         message= {
                                 'role': 'tool',
                                 'name': func_name,
@@ -501,9 +500,8 @@ class OllamaAPI:
                         arguments= function['arguments']
                         data= ''
                         if tools:
+                            print( '**TOOLCALL**:', func_name, arguments, flush=True )
                             data= tools.call_func( func_name, arguments, options.tool_env )
-                        #if options.debug_echo:
-                        #    print( '**TOOL**', data, flush=True )
                         message= {
                                 'role': 'tool',
                                 'tool_name': func_name,
