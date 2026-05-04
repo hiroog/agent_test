@@ -5,20 +5,25 @@
 ;;S model     qwen/qwen3.5-9b
 ;;S provider  openai
 
+;; LMStudio
+;;S base_url  http://localhost:1234
+;;S model     google/gemma-4-26b-a4b
+;;S provider  openai
+
 ;; llama.cpp
 ;;S base_url  http://localhost:8080
 ;;S model     Qwen3.5-27b
 ;;S provider  openai
 
 ;; Ollama-openai
-S base_url  http://localhost:11434
-S model     gpt-oss:120b-cloud
-S provider  openai
-
-;; Ollama
 ;;S base_url  http://localhost:11434
 ;;S model     gpt-oss:120b-cloud
-;;S provider  ollama
+;;S provider  openai
+
+;; Ollama
+S base_url  http://localhost:11434
+S model     gpt-oss:120b-cloud
+S provider  ollama
 
 ;;-----------------------------------------------------------------------------
 
@@ -69,7 +74,8 @@ S include_prompt  input/test05.md
 ======== test10
 
 I num_ctx   65536
-A tools	    list_files search_text read_file_range
+;;A tools	    list_files search_text read_file_range
+A tools	    read_source_code search_in_files
 F temperature 0.6
 F min_p	    0.0
 F top_p	    0.95
@@ -82,7 +88,8 @@ F frequency_penalty 1.0
 ======== assistant1
 
 I num_ctx   16384
-A tools	    list_files search_text read_file_range
+;;A tools	    list_files search_text read_file_range
+A tools	    read_source_code search_in_files
 A env       MCP_FOLDER_ROOT=input MCP_SOURCE_ROOT=input
 F temperature 0.6
 F min_p	    0.0

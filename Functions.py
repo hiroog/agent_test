@@ -18,7 +18,7 @@ class ToolEnv:
     def set( self, env_name, value ):
         self.env[env_name]= value
 
-    def get( self, env_name, defvalue ):
+    def get( self, env_name, defvalue= None ):
         if env_name in self.env:
             return  self.env[env_name]
         return  os.environ.get( env_name, defvalue )
@@ -169,6 +169,11 @@ def read_source_code( env:ToolEnv, file_name:str ) -> str:
     if engine_root != '':
         folder_list.append( os.path.join( engine_root, 'Engine/Source' ) )
         folder_list.append( os.path.join( engine_root, 'Engine/Plugins' ) )
+    print( 'project:', env.get( 'MCP_PROJECT_ROOT', '' ) )
+    print( 'folder:', env.get( 'MCP_FOLDER_ROOT', '' ) )
+    print( 'engine:', env.get( 'MCP_ENGINE_ROOT', '' ) )
+    print( 'source:', env.get( 'MCP_SOURCE_ROOT', '' ) )
+    print( 'list:', folder_list, flush=True )
     ignore_set= set( ['.','..'] )
     base_name= os.path.basename( file_name )
     if base_name in ignore_set:
@@ -176,7 +181,7 @@ def read_source_code( env:ToolEnv, file_name:str ) -> str:
     full_name= search_file( folder_list, base_name )
     print( 'load:', full_name, flush=True )
     if os.path.exists( full_name ):
-        with open( full_name, 'r', encoding='utf-8' ) as fi:
+        with open( full_name, 'r', encoding='utf-8', errors='replace' ) as fi:
             code= fi.read()
         return  ('** File: %s **\n\n' % base_name) + code
     print( 'not found:', full_name, flush=True )
@@ -237,7 +242,7 @@ def read_source_code3( env:ToolEnv, file_name:str ) -> str:
         full_name= search_file( folder_list, base_name )
     print( 'load:', full_name, flush=True )
     if os.path.exists( full_name ):
-        with open( full_name, 'r', encoding='utf-8' ) as fi:
+        with open( full_name, 'r', encoding='utf-8', errors='replace' ) as fi:
             code= fi.read()
         return  ('** File: %s **\n\n' % base_name) + code
     print( 'not found:', full_name, flush=True )

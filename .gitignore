@@ -25,3 +25,4 @@ sample*.txt
 /analyzer_stat.json
 /webfetch_whitelist.txt
 /local/
+SYSTEM00.md
