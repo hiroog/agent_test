@@ -104,6 +104,7 @@ class OllamaOptions(OptionBase):
         self.remove_think= False
         self.response_all= False
         self.debug_echo= False
+        self.verify= True
         self.tools= None
         self.tool_info_list= []
         self.tool_env= os.environ
@@ -199,7 +200,7 @@ class OllamaAPI:
         }
         try:
             start_time= time.perf_counter()
-            result= requests.post( api_url, headers=headers, data=data, timeout=options.timeout )
+            result= requests.post( api_url, headers=headers, data=data, timeout=options.timeout, verify=options.verify )
             request_time= time.perf_counter() - start_time
         except Exception as e:
             print( 'err-url:',api_url )
@@ -316,7 +317,7 @@ class OllamaAPI:
             'Authorization': 'Bearer %s' % os.environ.get('OPENAI_API_KEY', 'lm-studio'),
         }
         try:
-            result= requests.post( api_url, headers=headers, data=data, timeout=self.options.timeout )
+            result= requests.post( api_url, headers=headers, data=data, timeout=self.options.timeout, verify=self.options.verify )
         except Exception as e:
             return  '',408
         if result.status_code == 200:
@@ -344,7 +345,7 @@ class OllamaAPI:
         api_url= self.options.base_url + '/api/generate'
         data= json.dumps( params )
         try:
-            result= requests.post( api_url, headers={ 'Content-Type': 'application/json' }, data=data, timeout=self.options.timeout )
+            result= requests.post( api_url, headers={ 'Content-Type': 'application/json' }, data=data, timeout=self.options.timeout, verify=self.options.verify )
         except Exception as e:
             return  '',408
         if result.status_code == 200:
@@ -438,7 +439,7 @@ class OllamaAPI:
         }
         try:
             start_time= time.perf_counter()
-            result= requests.post( api_url, headers=headers, data=data, timeout=options.timeout )
+            result= requests.post( api_url, headers=headers, data=data, timeout=options.timeout, verify=options.verify )
             request_time= time.perf_counter() - start_time
         except Exception as e:
             print( 'err-url:',api_url )

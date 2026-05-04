@@ -351,6 +351,8 @@ def main( argv ):
                 ai= options.set_int( ai, argv, 'timeout' )
             elif arg == '--response_all':
                 ai= options.response_all= True
+            elif arg == '--noverify':
+                ai= options.verify= False
             elif arg == '--nossl':
                 ai= options.nossl= True
             elif arg == '--print':
