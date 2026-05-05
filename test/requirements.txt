@@ -1,6 +1,7 @@
 certifi==2026.2.25
 charset-normalizer==3.4.7
 idna==3.11
+p4python==2025.2.2863679
 requests==2.33.1
 slack_bolt==1.28.0
 slack_sdk==3.41.0

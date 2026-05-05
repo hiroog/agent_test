@@ -81,6 +81,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'prompt_dir' )
             elif arg == '--text':
                 ai= options.set_str( ai, argv, 'prompt_text' )
+            elif arg == '--noverify':
+                options.verify= False
             elif arg == '--print':
                 options.print= True
             elif arg == '--debug':

@@ -10,7 +10,6 @@ import fnmatch
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
-import Functions
 from Functions import get_toolbox,ToolEnv
 
 _RG= shutil.which( 'rg' )

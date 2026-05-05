@@ -32,7 +32,7 @@ class TextLoader:
     TYPE_DICT= '========'
     TYPE_TEXT= '====T'
     def __init__( self ):
-    	pass
+        self.bool_set= set(['true','1','True'])
 
     def load_text( self, lines, index ):
         line_count= len(lines)
@@ -62,6 +62,8 @@ class TextLoader:
                 map_obj[params[1]]= line[len(params[1])+2:].strip()
             elif param_type == 'I':
                 map_obj[params[1]]= int(params[2])
+            elif param_type == 'B':
+                map_obj[params[1]]= params[2] in self.bool_set
             elif param_type == 'F':
                 map_obj[params[1]]= float(params[2])
             elif param_type == 'A' or param_type == 'SA':
@@ -85,7 +87,7 @@ class TextLoader:
     def load( self, file_name ):
         if not os.path.exists( file_name ):
             return  None
-        with open( file_name, 'r', encoding='utf-8' ) as fi:
+        with open( file_name, 'r', encoding='utf-8', errors='ignore' ) as fi:
             lines= fi.readlines()
         map_obj= {}
         self.load_dict( lines, 0, map_obj, 8 )
@@ -101,6 +103,8 @@ class TextLoader:
                 fo.write( 'I %s %d\n' % (key, val) )
             elif type(val) is float:
                 fo.write( 'F %s %f\n' % (key, val) )
+            elif type(val) is bool:
+                fo.write( 'B %s %s\n' % (key, 'true' if val else 'false') )
             elif type(val) is list:
                 fo.write( 'A %s ' % key )
                 for v in val:
@@ -127,30 +131,72 @@ class TextLoader:
 
 #------------------------------------------------------------------------------
 
+def usage():
+    print( 'TextLoader v1.00 Hiroyuki Ogasawara' )
+    print( 'usage: TextLoader [options] <input_file>' )
+    print( 'options:' )
+    print( '  -o <output_file>' )
+    print( '  --test' )
+    sys.exit( 1 )
+
+def load_object( file_name ):
+    if file_name.lower().endswith( '.json' ):
+        import json
+        with open( file_name, 'r', encoding='utf-8', errors='replace' ) as fi:
+            return  json.loads( fi.read() )
+    return  TextLoader().load( file_name )
+
+def save_object( file_name, obj ):
+    if file_name.lower().endswith( '.json' ):
+        import json
+        with open( file_name, 'w', encoding='utf-8' ) as fo:
+            fo.write( json.dumps( obj, ensure_ascii=False, indent=4 ) )
+    else:
+        TextLoader().save( file_name, obj )
+
 def main( argv ):
+    output_name= None
     file_name= None
+    test_mode= False
     acount= len(argv)
     ai= 1
     while ai< acount:
         arg= argv[ai]
         if arg[0] == '-':
-            pass
+            if arg == '-o':
+                if ai+1 < acount:
+                    ai+= 1
+                    output_name= argv[ai]
+            elif arg == '--test':
+                test_mode= True
+            else:
+                usage()
         else:
             file_name= arg
         ai+= 1
+
+    if test_mode:
+        obj= load_object( file_name )
+        text_name= 'loader.output.txt'
+        json_name= 'loader.output.json'
+        save_object( text_name, obj )
+        save_object( json_name, obj )
+        obj2= load_object( text_name )
+        if obj != obj2:
+            print( 'Failed', obj, obj2 )
+            return  1
+        return  0
+
     if file_name:
-        import json
-        loader= TextLoader()
-        if file_name.lower().endswith( '.json' ):
-            with open( file_name, 'r', encoding='utf-8' ) as fi:
-                obj= json.loads( fi.read() )
-        else:
-            obj= loader.load( file_name )
-        print( obj )
-        if obj:
-            loader.save( file_name + '.output.txt', obj )
-            with open( file_name + '.output.json', 'w', encoding='utf-8' ) as fo:
-                fo.write( json.dumps( obj, ensure_ascii=False, indent=4 ) )
+        obj= load_object( file_name )
+        if obj is None:
+            print( 'load error:', file_name )
+            return  1
+
+        if output_name:
+            save_object( output_name, obj )
+    else:
+        usage()
     return  0
 
 if __name__=='__main__':

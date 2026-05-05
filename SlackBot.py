@@ -335,6 +335,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'base_url' )
             elif arg == '--model':
                 ai= options.set_str( ai, argv, 'model' )
+            elif arg == '--noverify':
+                options.verify= False
             elif arg == '--print':
                 options.print= True
             elif arg == '--debug':

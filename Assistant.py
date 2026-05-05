@@ -122,7 +122,7 @@ class AssistantOptions(OllamaAPI4.OllamaOptions):
 
 class Assistant:
 
-    MERGE_KEY_LIST= [ 'base_url', 'provider', 'model', 'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'presence_penalty', 'frequency_penalty', 'env', 'base_prompt', 'system_prompt', 'header' ]
+    MERGE_KEY_LIST= [ 'base_url', 'provider', 'model', 'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'presence_penalty', 'frequency_penalty', 'env', 'base_prompt', 'system_prompt', 'header', 'verify' ]
 
     def __init__( self, options ):
         self.config= self.load_file( options.config_file )
