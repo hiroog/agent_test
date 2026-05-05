@@ -569,7 +569,7 @@ def main( argv ):
                 options.nossl= True
             elif arg == '--use_mention':
                 options.use_mention= True
-            elif arg == '--debug':
+            elif arg == '--debug' or arg == '--print':
                 options.debug= True
             else:
                 print( 'Error: unknown option %s' % arg )
