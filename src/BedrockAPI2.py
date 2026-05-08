@@ -218,7 +218,13 @@ class BedrockAPI:
         for content in content_list:
             if 'text' in content:
                 print( content['text'] )
-                print( '---' )
+            elif 'toolUse' in content:
+                print( 'toolUse' )
+                self.dump_object( '', content['toolUse'], set() )
+            elif 'toolResult' in content:
+                print( 'toolResult' )
+                for result in content['toolResult']['content']:
+                    print( result['text'] )
             else:
                 print( content )
                 print( '---' )
@@ -240,7 +246,7 @@ def main():
         """Add two numbers"""
         return  a + b
     import Functions
-    from CommonAPI
+    import CommonAPI
     mcp= Functions.get_toolbox()
     mcp.tool()( calc_add )
     options= CommonAPI.CommonOptions(

@@ -139,7 +139,7 @@ input/test_program_code.cpp:12:20: error: no matching function for call to 'test
 ======== cppreview
 
 I num_ctx   65536
-A tools	    list_files search_text read_file_range
+A tools	    list_files search_text read_file_range create_issue
 A env       MCP_FOLDER_ROOT=input MCP_SOURCE_ROOT=input
 F temperature 0.6
 F min_p	    0.0
