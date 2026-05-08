@@ -109,6 +109,48 @@ def read_source_code3( env:ToolEnv, file_name:str ) -> str:
         engine_root= os.path.abspath( engine_root )
         folder_list.append( os.path.join( engine_root, 'Engine/Source' ) )
         folder_list.append( os.path.join( engine_root, 'Engine/Plugins' ) )
+    print( 'project:', env.get( 'MCP_PROJECT_ROOT', '' ) )
+    print( 'folder:', env.get( 'MCP_FOLDER_ROOT', '' ) )
+    print( 'engine:', env.get( 'MCP_ENGINE_ROOT', '' ) )
+    print( 'source:', env.get( 'MCP_SOURCE_ROOT', '' ) )
+    print( 'list:', folder_list, flush=True )
+    ignore_set= set( ['.','..'] )
+    base_name= os.path.basename( file_name )
+    if base_name in ignore_set:
+        return  'Invalid filename "%s"' % file_name
+    if '..' in file_name:
+        return  'Invalid path "%s"' % file_name
+    full_name= search_path3( folder_list, file_name )
+    if full_name is None:
+        full_name= search_file( folder_list, base_name )
+    print( 'load:', full_name, flush=True )
+    if os.path.exists( full_name ):
+        with open( full_name, 'r', encoding='utf-8', errors='replace' ) as fi:
+            code= fi.read()
+        return  ('** File: %s **\n\n' % base_name) + code
+    print( 'not found:', full_name, flush=True )
+    return  'File "%s" not found' % file_name
+
+
+@mcp.tool()
+def read_source_code4( env:ToolEnv, file_name:str ) -> str:
+    """
+    Read a source code.
+    By simply specifying a partial path or filename, you can search the folders and read the file content.
+    """
+    folder_list= []
+    folder_root= env.get( 'MCP_FOLDER_ROOT', env.get( 'MCP_SOURCE_ROOT', '' ) )
+    if folder_root != '':
+        folder_list.append( os.path.abspath( folder_root ) )
+    project_root= env.get( 'MCP_PROJECT_ROOT', '' )
+    if project_root != '':
+        project_root= os.path.abspath( project_root )
+        folder_list.append( os.path.join( project_root, 'Source' ) )
+        folder_list.append( os.path.join( project_root, 'Plugins' ) )
+    print( 'project:', env.get( 'MCP_PROJECT_ROOT', '' ) )
+    print( 'folder:', env.get( 'MCP_FOLDER_ROOT', '' ) )
+    print( 'source:', env.get( 'MCP_SOURCE_ROOT', '' ) )
+    print( 'list:', folder_list, flush=True )
     ignore_set= set( ['.','..'] )
     base_name= os.path.basename( file_name )
     if base_name in ignore_set:

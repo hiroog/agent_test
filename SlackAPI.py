@@ -195,7 +195,7 @@ def usage():
     print( 'options:' )
     print( '  --channel <channel>' )
     print( '  --update_cache' )
-    sys.exit( 0 )
+    sys.exit( 1 )
 
 
 def main( argv ):

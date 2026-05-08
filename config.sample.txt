@@ -17,18 +17,24 @@
 
 ;; llama.cpp
 ;;S base_url  http://localhost:8080
-;;S model     Qwen3.5-27b
+;;S model     Qwen3.6-27b
 ;;S provider  openai
 
 ;; Ollama-openai
-S base_url  http://localhost:11434
-S model     gpt-oss:120b-cloud
-S provider  openai
+;;S base_url  http://localhost:11434
+;;S model     gpt-oss:120b-cloud
+;;S provider  openai
 
 ;; Ollama
 ;;S base_url  http://localhost:11434
 ;;S model     gpt-oss:120b-cloud
 ;;S provider  ollama
+
+;; Bedrock
+;;S base_url  us-east-1
+;;S model     global.amazon.nova-2-lite-v1:0
+;;S provider  bedrock
+
 
 ;;-----------------------------------------------------------------------------
 

@@ -9,7 +9,7 @@ import importlib
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
-import OllamaAPI4
+import CommonAPI
 import SlackAPI
 import Functions
 import TextLoader
@@ -90,7 +90,7 @@ import TextLoader
 
 #------------------------------------------------------------------------------
 
-class AssistantOptions(OllamaAPI4.OllamaOptions):
+class AssistantOptions(CommonAPI.CommonOptions):
     def __init__( self, **args ):
         super().__init__()
         self.print= False
@@ -131,7 +131,7 @@ class Assistant:
         self.options= options
         self.options.merge_params( self.config, self.MERGE_KEY_LIST )
         options.set_env( self.options.env )
-        self.ollama_api= OllamaAPI4.OllamaAPI( options )
+        self.common_api= CommonAPI.CommonAPI( options )
         self.import_inline_modules()
 
     #--------------------------------------------------------------------------
@@ -205,7 +205,7 @@ class Assistant:
         if 'env' in input_obj:
             local_options.set_env( input_obj['env'] )
         header_text= input_obj.get( 'header', local_options.header )
-        response,status_code= self.ollama_api.generate( prompt, system, None, message_list, local_options )
+        response,status_code= self.common_api.generate( prompt, system, None, message_list, local_options )
         if status_code != 200:
             print( 'Generate Error: %d' % status_code, flush=True )
             return  response,status_code,local_options
@@ -238,10 +238,10 @@ class Assistant:
     #--------------------------------------------------------------------------
 
     def stat_dump( self ):
-        self.ollama_api.stat_dump()
+        self.common_api.stat_dump()
 
     def f_post_or_save( self ):
-        with OllamaAPI4.ExecTime( 'Assistant' ):
+        with CommonAPI.ExecTime( 'Assistant' ):
             if self.options.channel:
                 token= os.environ.get( 'SLACK_API_TOKEN', None )
                 if token is None:

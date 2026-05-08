@@ -26,8 +26,8 @@
 
 
 ## Skills (webtool-based)
-Skills は特定サービスとのやり取り手順を書いた Markdown 形式の指示ファイルです。
-Skill は `read_file_range` を使って読み込めます。
+Skill は特定サービスとのやり取り手順を書いた Markdown 形式の指示ファイルです。
+`～_skill.md` を `list_files` で探し、`read_file_range` を使って読み込みます。
 
 
 ## Response Guidelines

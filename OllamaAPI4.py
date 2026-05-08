@@ -10,6 +10,9 @@ import base64
 import time
 import datetime
 
+#import BedrockAPI
+#bedrock= None
+
 #------------------------------------------------------------------------------
 
 class OptionBase:
@@ -528,6 +531,11 @@ class OllamaAPI:
             return  self.generate_ollama_chat( text, system, image_data, message_list, options )
         elif options.provider == 'lmstudio' or options.provider == 'openai':
             return  self.chat_oai( text, system, image_data, message_list, options )
+        #elif options.provider == 'bedrock':
+        #    global bedrock
+        #    if bedrock is None:
+        #        bedrock= BedrockAPI.BedrockAPI( self )
+        #    return  bedrock.chat( text, system, image_data, message_list, options )
         return  '',400
 
     #--------------------------------------------------------------------------

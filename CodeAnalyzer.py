@@ -13,7 +13,7 @@ import FileListLib
 from Functions import get_toolbox
 import TextLoader
 import SlackAPI
-from OllamaAPI4 import OptionBase, ExecTime
+from CommonAPI import OptionBase, ExecTime
 
 #------------------------------------------------------------------------------
 
@@ -28,6 +28,9 @@ class AnalyzerOption(OptionBase):
         self.preset= 'cppreview'
         self.config_file= 'config.txt'
         self.prompt_dir= '.'
+        self.base_url= None
+        self.provider= None
+        self.model= None
         self.debug= False
         self.limit= 0
         #---------------------------
@@ -77,7 +80,14 @@ class CodeAnalyzer:
         self.file_list= None
         self.file_map= {}
         self.uemode= options.project is not None
-        options= Assistant.AssistantOptions( prompt_dir=options.prompt_dir, config_file=options.config_file, timeout=60*20 )
+        options= Assistant.AssistantOptions(
+                    prompt_dir=options.prompt_dir,
+                    config_file=options.config_file,
+                    base_url=options.base_url,
+                    provider=options.provider,
+                    model=options.model,
+                    timeout=60*20
+                    )
         if self.options.debug:
             options.print= True
             options.debug_echo= True
@@ -497,7 +507,7 @@ class PostTool:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CodeAnalyzer v1.21 Hiroyuki Ogasawara' )
+    print( 'CodeAnalyzer v1.22 Hiroyuki Ogasawara' )
     print( 'usage: CodeAnalyzer [<options>]' )
     print( 'options:' )
     print( '  --root <root_folder>        default .' )
@@ -552,6 +562,12 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'preset' )
             elif arg == '--user_alias':
                 ai= options.set_str( ai, argv, 'alias_file' )
+            elif arg == '--host':
+                ai= options.set_str( ai, argv, 'base_url' )
+            elif arg == '--provider':
+                ai= options.set_str( ai, argv, 'provider' )
+            elif arg == '--model':
+                ai= options.set_str( ai, argv, 'model' )
             elif arg == '--limit':
                 ai= options.set_int( ai, argv, 'limit' )
             elif arg == '--post':

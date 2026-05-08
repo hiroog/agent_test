@@ -31,14 +31,58 @@ fi
 if [ -e $SLACKENV_FILE ]; then
     . $SLACKENV_FILE
 fi
+#
+#------------------------------------------------------------------------------
 
-BASE_OPTIONS="--config $CONFIG_FILE --print --debug"
+ARG1="$1"
+if [ "$ARG1" = "" ]; then
+ARG1=openai
+fi
+
+if [ "$ARG1" = "ollama" ]; then
+TS_HOST=http://localhost:11434
+TS_PROVIDER=ollama
+TS_MODEL=gpt-oss:120b-cloud
+fi
+
+if [ "$ARG1" = "openai" ]; then
+TS_HOST=http://localhost:11434
+TS_PROVIDER=openai
+TS_MODEL=gpt-oss:120b-cloud
+fi
+
+if [ "$ARG1" = "local1" ]; then
+TS_HOST=$TS_HOST_LOCAL1
+TS_PROVIDER=$TS_PROVIDER_LOCAL1
+TS_MODEL=$TS_MODEL_LOCAL1
+fi
+
+if [ "$ARG1" = "local2" ]; then
+TS_HOST=$TS_HOST_LOCAL2
+TS_PROVIDER=$TS_PROVIDER_LOCAL2
+TS_MODEL=$TS_MODEL_LOCAL2
+fi
+
+if [ "$ARG1" = "local3" ]; then
+TS_HOST=$TS_HOST_LOCAL3
+TS_PROVIDER=$TS_PROVIDER_LOCAL3
+TS_MODEL=$TS_MODEL_LOCAL3
+fi
+
+if [ "$ARG1" = "local4" ]; then
+TS_HOST=$TS_HOST_LOCAL4
+TS_PROVIDER=$TS_PROVIDER_LOCAL4
+TS_MODEL=$TS_MODEL_LOCAL4
+fi
+
+
+BASE_OPTIONS="--config $CONFIG_FILE --print --debug --host $TS_HOST --provider $TS_PROVIDER --model $TS_MODEL"
 
 #------------------------------------------------------------------------------
 
 if [ $USE_TEXTLOADER = 1 ];then
 python3 TextLoader.py test/data_sample.json --test
-python3 TextLoader.py test/test_config.txt --test
+python3 TextLoader.py config.sample.txt --test
 fi
 
 #------------------------------------------------------------------------------
@@ -47,6 +91,8 @@ fi
 if [ $USE_TEST01 = 1 ];then
 python3 Assistant.py $BASE_OPTIONS --preset test01 --input input/test01.txt
 fi
+
+# tool calling json
 if [ $USE_TEST02 = 1 ];then
 python3 Assistant.py $BASE_OPTIONS --preset test02 --input input/test02.json
 fi

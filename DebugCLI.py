@@ -61,6 +61,9 @@ def usage():
     print( '  --config <config_file>        default: config.txt' )
     print( '  --prompt_dir <dir>' )
     print( '  --text <message>' )
+    print( '  --host <base_url>' )
+    print( '  --provider <provider>' )
+    print( '  --model <model>' )
     print( '  --print' )
     print( '  --debug' )
     sys.exit( 1 )
@@ -81,6 +84,12 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'prompt_dir' )
             elif arg == '--text':
                 ai= options.set_str( ai, argv, 'prompt_text' )
+            elif arg == '--host':
+                ai= options.set_str( ai, argv, 'base_url' )
+            elif arg == '--provider':
+                ai= options.set_str( ai, argv, 'provider' )
+            elif arg == '--model':
+                ai= options.set_str( ai, argv, 'model' )
             elif arg == '--noverify':
                 options.verify= False
             elif arg == '--print':

@@ -12,7 +12,7 @@ lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
 import Assistant
-from OllamaAPI4 import ExecTime
+from CommonAPI import ExecTime
 from SlackAPI import save_json, load_json
 
 # env:
