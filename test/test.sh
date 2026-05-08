@@ -81,41 +81,41 @@ BASE_OPTIONS="--config $CONFIG_FILE --print --debug --host $TS_HOST --provider $
 #------------------------------------------------------------------------------
 
 if [ $USE_TEXTLOADER = 1 ];then
-python3 TextLoader.py test/data_sample.json --test
-python3 TextLoader.py config.sample.txt --test
+python3 src/TextLoader.py test/data_sample.json --test
+python3 src/TextLoader.py config.sample.txt --test
 fi
 
 #------------------------------------------------------------------------------
 
 # tool calling
 if [ $USE_TEST01 = 1 ];then
-python3 Assistant.py $BASE_OPTIONS --preset test01 --input input/test01.txt
+python3 src/Assistant.py $BASE_OPTIONS --preset test01 --input input/test01.txt
 fi
 
 # tool calling json
 if [ $USE_TEST02 = 1 ];then
-python3 Assistant.py $BASE_OPTIONS --preset test02 --input input/test02.json
+python3 src/Assistant.py $BASE_OPTIONS --preset test02 --input input/test02.json
 fi
 
 # inline propt
 if [ $USE_TEST03 = 1 ];then
-python3 Assistant.py $BASE_OPTIONS --preset test03
+python3 src/Assistant.py $BASE_OPTIONS --preset test03
 fi
 
 # preset
 if [ $USE_TEST04 = 1 ];then
-python3 Assistant.py $BASE_OPTIONS                 --input input/test04.txt
+python3 src/Assistant.py $BASE_OPTIONS                 --input input/test04.txt
 fi
 
 # include
 if [ $USE_TEST05 = 1 ];then
-python3 Assistant.py $BASE_OPTIONS --preset test05
+python3 src/Assistant.py $BASE_OPTIONS --preset test05
 fi
 
 # complex tool calling
 if [ $USE_TEST10 = 1 ];then
   if [ -e local/flatlib5 ];then
-python3 Assistant.py $BASE_OPTIONS --preset test10 --input input/test10.txt
+python3 src/Assistant.py $BASE_OPTIONS --preset test10 --input input/test10.txt
   fi
 fi
 
@@ -129,13 +129,13 @@ if [ $USE_SLACK = 1 ];then
 fi
 
 if [ $USE_ASSISTANT1 = 1 ];then
-python3 Assistant.py $BASE_OPTIONS --preset assistant1 $POST_FLAG
+python3 src/Assistant.py $BASE_OPTIONS --preset assistant1 $POST_FLAG
 fi
 
 #------------------------------------------------------------------------------
 
 if [ $USE_CPPREVIEW = 1 ];then
-python3 CodeAnalyzer.py $BASE_OPTIONS --list test/test_list.txt --load_list --root input --analyze $POST_FLAG
+python3 src/CodeAnalyzer.py $BASE_OPTIONS --list test/test_list.txt --load_list --root input --analyze $POST_FLAG
 fi
 
 #------------------------------------------------------------------------------
@@ -144,7 +144,7 @@ if [ $USE_SLACKBOT = 1 ];then
   if [ "$SLACK_BOT_TOKEN" != "" ];then
     if [ "$SLACK_APP_TOKEN" != "" ];then
       if [ -e local/skills ];then
-python3 DebugCLI.py $BASE_OPTIONS --text "jenkinsの状態を見たい"
+python3 src/DebugCLI.py $BASE_OPTIONS --text "jenkinsの状態を見たい"
       fi
     fi
   fi

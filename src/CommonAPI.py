@@ -7,6 +7,9 @@ import json
 import time
 import datetime
 
+lib_path= os.path.dirname(__file__)
+if lib_path not in sys.path:
+    sys.path.append( lib_path )
 
 #------------------------------------------------------------------------------
 # {
@@ -28,8 +31,6 @@ import datetime
 #    'name': 'func'
 #    'tool_call_id': 'func'
 # },
-
-
 
 #------------------------------------------------------------------------------
 
@@ -330,5 +331,4 @@ def main( argv ):
 
 if __name__=='__main__':
     sys.exit( main( sys.argv ) )
-
 
