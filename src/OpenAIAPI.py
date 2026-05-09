@@ -27,10 +27,7 @@ class OpenAIAPI:
 
     def chat_1( self, message_list, tools, options ):
         if options.debug_echo:
-            print( '============= SendMessages' )
-            for message in message_list:
-                self.dump_message( message )
-            print( '=============', flush=True )
+            self.manager.dump_message_list( 'SendMessages', message_list )
         params= {
             'model': options.model,
             'messages': message_list,
@@ -39,7 +36,13 @@ class OpenAIAPI:
             params['tools']= options.tool_info_list
         elif tools:
             params['tools']= tools.get_tools()
-        api_url= options.base_url + '/v1/chat/completions'
+        base_url= options.base_url
+        if options.base_url[-1] == '/':
+            base_url= base_url[:-1]
+        if base_url.endswith( 'v1' ):
+            api_url= base_url + '/chat/completions'
+        else:
+            api_url= base_url + '/v1/chat/completions'
         data= json.dumps( params )
         if options.temperature >= 0.0:
             params['temperature']= options.temperature
@@ -77,12 +80,12 @@ class OpenAIAPI:
         if result.status_code == 200:
             data= result.json()
             if options.debug_echo:
-                print( '============= Response' )
-                self.dump_response( data )
-                print( '=============' )
+                self.manager.dump_response( data )
             if 'usage' in data:
                 usage= data['usage']
                 self.manager.stat_add( usage.get('completion_tokens',0), usage.get('prompt_tokens',0), request_time )
+            if 'error' in data:
+                return  { 'role': 'assistant', 'content': data['error'] },200
             message= data['choices'][0]['message']
             return  message,result.status_code
         else:
@@ -192,27 +195,6 @@ class OpenAIAPI:
         else:
             print( 'Error: %d' % result.status_code, flush=True )
         return  '',result.status_code
-
-    #--------------------------------------------------------------------------
-
-    def dump_object( self, ch, obj, ignore_set ):
-        for key in obj:
-            if key not in ignore_set:
-                print( ' %s %s=%s' % (ch,key,obj[key]) )
-
-    def dump_message( self, message ):
-        role= message.get( 'role', '<UNKNOWN>' )
-        content= message.get( 'content', '<None>' )
-        print( '----- Role:[%s]' % role )
-        print( content )
-        ignore_set= set( ['role','content'] )
-        self.dump_object( '*', message, ignore_set )
-
-    def dump_response( self, response ):
-        if 'message' in response:
-            self.dump_message( response['message'] )
-        ignore_set= set( ['message'] )
-        self.dump_object( '+', response, ignore_set )
 
     #--------------------------------------------------------------------------
 

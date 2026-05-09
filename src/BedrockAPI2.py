@@ -258,7 +258,7 @@ def main():
                 tool_info_list= mcp.get_tools( ['calc_add'] )
             )
     api= BedrockAPI( options, None )
-    result,_= api.chat( 'tool使って128348121+12734891計算して', None, None, None, options )
+    result,_= api.chat( 'tool使って128348121+12734891+38298342計算して', None, None, None, options )
     print( result )
     return  0
 

@@ -30,53 +30,6 @@ class OllamaAPI:
 
     #--------------------------------------------------------------------------
 
-    def generate( self, text, system= None, image_data= None ):
-        params= {
-            'model': self.options.model,
-            'prompt': text,
-            'stream': False,
-        }
-        if system:
-            params['system']= system
-        if image_data:
-            params['images']= [ image_to_base64( image_data ) ]
-        api_url= self.options.base_url + '/api/generate'
-        data= json.dumps( params )
-        try:
-            result= requests.post( api_url, headers={ 'Content-Type': 'application/json' }, data=data, timeout=self.options.timeout, verify=self.options.verify )
-        except Exception as e:
-            return  '',408
-        if result.status_code == 200:
-            data= result.json()
-            response= data['response']
-            if self.options.remove_think:
-                response= self.remove_think_tag( response )
-            return  response,result.status_code
-        else:
-            print( 'Error: %d' % result.status_code, flush=True )
-        return  '',result.status_code
-
-    #--------------------------------------------------------------------------
-
-    def dump_object( self, ch, obj, ignore_set ):
-        for key in obj:
-            if key not in ignore_set:
-                print( ' %s %s=%s' % (ch,key,obj[key]) )
-
-    def dump_message( self, message ):
-        role= message.get( 'role', '<UNKNOWN>' )
-        content= message.get( 'content', '<None>' )
-        print( '----- Role:[%s]' % role )
-        print( content )
-        ignore_set= set( ['role','content'] )
-        self.dump_object( '*', message, ignore_set )
-
-    def dump_response( self, response ):
-        if 'message' in response:
-            self.dump_message( response['message'] )
-        ignore_set= set( ['message'] )
-        self.dump_object( '+', response, ignore_set )
-
     def decode_streaming( self, result ):
         content= ''
         thinking= ''
@@ -105,10 +58,7 @@ class OllamaAPI:
 
     def chat_1( self, message_list, tools, streaming= False, options= None ):
         if options.debug_echo:
-            print( '============= SendMessages' )
-            for message in message_list:
-                self.dump_message( message )
-            print( '=============', flush=True )
+            self.manager.dump_message_list( 'SendMessages', message_list )
         params= {
             'model': options.model,
             'messages': message_list,
@@ -154,9 +104,7 @@ class OllamaAPI:
             else:
                 data= result.json()
             if options.debug_echo:
-                print( '============= Response' )
-                self.dump_response( data )
-                print( '=============' )
+                self.manager.dump_response( data )
             self.manager.stat_add( data.get('eval_count',0), data.get('prompt_eval_count',0), request_time )
             message= data['message']
             return  message,result.status_code
@@ -198,6 +146,7 @@ class OllamaAPI:
                 tool_calls= message.get( 'tool_calls', None )
                 if tool_calls:
                     for tool_call in tool_calls:
+                        tool_call_id= tool_call['id']
                         function= tool_call['function']
                         func_name= function['name']
                         arguments= function['arguments']
@@ -208,6 +157,7 @@ class OllamaAPI:
                         message= {
                                 'role': 'tool',
                                 'tool_name': func_name,
+                                'tool_call_id': tool_call_id,
                                 'content': data,
                             }
                         message_list.append( message )
@@ -220,6 +170,34 @@ class OllamaAPI:
                     response= self.remove_think_tag( response )
             break
         return  response,status_code
+
+    #--------------------------------------------------------------------------
+
+    def generate( self, text, system= None, image_data= None ):
+        params= {
+            'model': self.options.model,
+            'prompt': text,
+            'stream': False,
+        }
+        if system:
+            params['system']= system
+        if image_data:
+            params['images']= [ image_to_base64( image_data ) ]
+        api_url= self.options.base_url + '/api/generate'
+        data= json.dumps( params )
+        try:
+            result= requests.post( api_url, headers={ 'Content-Type': 'application/json' }, data=data, timeout=self.options.timeout, verify=self.options.verify )
+        except Exception as e:
+            return  '',408
+        if result.status_code == 200:
+            data= result.json()
+            response= data['response']
+            if self.options.remove_think:
+                response= self.remove_think_tag( response )
+            return  response,result.status_code
+        else:
+            print( 'Error: %d' % result.status_code, flush=True )
+        return  '',result.status_code
 
     #--------------------------------------------------------------------------
 

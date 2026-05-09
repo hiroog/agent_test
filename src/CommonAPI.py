@@ -194,52 +194,7 @@ class CommonAPI:
         if request_count != 0:
             print( '# total_input=%d  max_input=%d' % (total_input,max_input) )
             print( '# total_output=%d  max_output=%d' % (total_output,max_output) )
-            print( '# total %f token/s' % (total_output/total_sec) )
-
-    #--------------------------------------------------------------------------
-
-    def dump_object( self, ch, obj, ignore_set ):
-        for key in obj:
-            if key not in ignore_set:
-                print( ' %s %s=%s' % (ch,key,obj[key]) )
-
-    def dump_message( self, message ):
-        role= message.get( 'role', '<UNKNOWN>' )
-        content= message.get( 'content', '<None>' )
-        print( '----- Role:[%s]' % role )
-        print( content )
-        ignore_set= set( ['role','content'] )
-        self.dump_object( '*', message, ignore_set )
-
-    def dump_response( self, response ):
-        if 'message' in response:
-            self.dump_message( response['message'] )
-        ignore_set= set( ['message'] )
-        self.dump_object( '+', response, ignore_set )
-
-    def decode_streaming( self, result ):
-        content= ''
-        thinking= ''
-        tools= []
-        for line in result.text.split( '\n' ):
-            data= json.loads( line )
-            message= data['message']
-            role= message['role']
-            content+= message['content']
-            if 'thinking' in message:
-                thinking+= message['thinking']
-            if 'tool_calls' in message:
-                tools.extend( message['tool_calls'] )
-            if data['done']:
-                break
-        message['content']= content
-        if thinking != '':
-            message['thinking']= thinking
-        if message['role'] == '':
-            message['role']= 'assistant'
-        if tools != []:
-            message['tool_calls']= tools
-        return  data
+            print( '# total %f token/s' % (total_output/total_sec), flush=True )
 
     #--------------------------------------------------------------------------
 
@@ -250,6 +205,83 @@ class CommonAPI:
         if api:
             return  api.chat( text, system, image_data, message_list, options )
         return  'Unknown provider: %s' % provider,400
+
+    #--------------------------------------------------------------------------
+
+    def dump_object( self, ch, obj, ignore_set ):
+        has_key= False
+        for key in obj:
+            if key not in ignore_set:
+                if not has_key:
+                    has_key= True
+                    print( '<<<Params>>>' )
+                print( ' %s %s=%s' % (ch,key,obj[key]) )
+
+    def dump_toolcalls( self, message ):
+        if 'tool_calls' in message:
+            print( '<<<ToolCalls>>>' )
+            for tool_call in message['tool_calls']:
+                tool_id= tool_call['id']
+                func= tool_call['function']
+                print( ' * 🛠️ToolCall: "%s" (id:%s)' % (func['name'],tool_id), func['arguments'] )
+
+    def dump_toolresult( self, message ):
+        role= message.get( 'role', '<UNKNOWN>' )
+        if role == 'tool':
+            name= message.get('name')
+            if name is None:
+                name= message.get('tool_name')
+            content= message.get('content','<None>')
+            tool_call_id= message.get('tool_call_id','')
+            print( '<<ToolCallResult "%s" (id:%s)>>' % (name,tool_call_id) )
+            print( content )
+
+    def dump_reasoning( self, message ):
+        reasoning_text= message.get('reasoning_content')
+        if not reasoning_text:
+            reasoning_text= message.get('reasoning')
+        if not reasoning_text:
+            reasoning_text= message.get('thinking')
+        if reasoning_text:
+            print( '<<<Thinking>>>' )
+            print( reasoning_text )
+
+    def dump_content( self, message ):
+        if 'content' in message:
+            text= message.get('content', '')
+            if text.strip() != '':
+                print( '<<<Content>>>' )
+                print( text )
+
+    def dump_message( self, message ):
+        role= message.get( 'role', '<UNKNOWN>' )
+        content= message.get( 'content', '<None>' )
+        print( '----- Role:[%s] -----' % role )
+        if role == 'tool':
+            self.dump_toolresult( message )
+            ignore_set= set( ['role','content','name','tool_name','tool_call_id'] )
+        else:
+            self.dump_reasoning( message )
+            self.dump_content( message )
+            self.dump_toolcalls( message )
+            ignore_set= set( ['role','content','tool_calls','reasoning_content','reasoning','thinking'] )
+        self.dump_object( '*', message, ignore_set )
+
+    def dump_response( self, response ):
+        print( '=============== Response ===============' )
+        if 'message' in response:
+            self.dump_message( response['message'] )
+        if 'choices' in response:
+            self.dump_message( response['choices'][0]['message'] )
+        ignore_set= set( ['message','choices'] )
+        self.dump_object( '+', response, ignore_set )
+        print( '==============================================', flush=True )
+
+    def dump_message_list( self, title, message_list ):
+        print( '=============== %s ===============' % title )
+        for message in message_list:
+            self.dump_message( message )
+        print( '==============================================', flush=True )
 
     #--------------------------------------------------------------------------
 

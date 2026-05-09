@@ -46,7 +46,7 @@ TS_MODEL=gpt-oss:120b-cloud
 fi
 
 if [ "$ARG1" = "openai" ]; then
-TS_HOST=http://localhost:11434
+TS_HOST=http://localhost:11434/v1
 TS_PROVIDER=openai
 TS_MODEL=gpt-oss:120b-cloud
 fi
@@ -73,6 +73,12 @@ if [ "$ARG1" = "local4" ]; then
 TS_HOST=$TS_HOST_LOCAL4
 TS_PROVIDER=$TS_PROVIDER_LOCAL4
 TS_MODEL=$TS_MODEL_LOCAL4
+fi
+
+if [ "$ARG1" = "local5" ]; then
+TS_HOST=$TS_HOST_LOCAL5
+TS_PROVIDER=$TS_PROVIDER_LOCAL5
+TS_MODEL=$TS_MODEL_LOCAL5
 fi
 
 
