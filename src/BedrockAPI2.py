@@ -60,14 +60,30 @@ class BedrockAPI:
                 result_list.append( message )
         return  result_list,system_list
 
+
+    def openai_to_bedrock( self, message_list ):
+        bedrock_list= []
+        system_message= None
+        for openai_message in message_list:
+            role= openai_message.get('role')
+            if role == 'system':
+                system_message= [ { 'text': openai_message.get('content','') } ]
+                continue
+            content= openai_message.get('content', '')
+            bendrock_content_list= []
+            if content != '':
+                bendrock_content_list.append( { 'text': content } )
+            for tool_call in openai_message.get('tool_calls',[]):
+                pass
+            bedrock_message= { 'role': role, 'content': bedrock_content_list }
+            bedrock_list.append( bedrock_message )
+
+
     #--------------------------------------------------------------------------
 
     def chat_1( self, message_list, tools, options ):
         if options.debug_echo:
-            print( '============= SendMessages' )
-            for message in message_list:
-                self.dump_message( message )
-            print( '=============', flush=True )
+            self.dump_message_list( message_list )
 
         toolConfig= None
         openai_tools= None
@@ -81,12 +97,20 @@ class BedrockAPI:
                 }
 
         inferenceConfig= {}
+        additionalModelRequestFields= {}
         if options.temperature >= 0.0:
             inferenceConfig['temperature']= options.temperature
+        if options.top_k > 0:
+            additionalModelRequestFields['top_k']= options.top_k
         if options.top_p > 0.0:
             inferenceConfig['topP']= options.top_p
+        if options.max_tokens > 0:
+            inferenceConfig['maxTokens']= options.max_tokens
+        if options.reasoning != 'off':
+            tokens= { 'default': 4096 }
+            additionalModelRequestFields['thinking']= { 'type': 'enabled', 'budget_tokens': tokens.get(options.reasoning,1024) }
         if options.debug_echo:
-            print( 'options=', inferenceConfig, flush=True )
+            print( 'options=', inferenceConfig, additionalModelRequestFields, flush=True )
 
         message_list,system_list= self.split_system( message_list )
 
@@ -101,6 +125,8 @@ class BedrockAPI:
                 params['toolConfig']= toolConfig
             if inferenceConfig:
                 params['inferenceConfig']= inferenceConfig
+            if additionalModelRequestFields:
+                params['additionalModelRequestFields']= additionalModelRequestFields
 
             start_time= time.perf_counter()
             result= self.client.converse( **params )
@@ -112,9 +138,7 @@ class BedrockAPI:
         status_code= result.get('ResponseMetadata',{}).get('HTTPStatusCode',0)
         if status_code == 200:
             if options.debug_echo:
-                print( '============= Response' )
                 self.dump_response( result )
-                print( '=============' )
             if 'usage' in result:
                 usage= result['usage']
                 if self.manager:
@@ -211,20 +235,35 @@ class BedrockAPI:
             if key not in ignore_set:
                 print( ' %s %s=%s' % (ch,key,obj[key]) )
 
+    def dump_reasoning( self, message ):
+        reasoning_text= message.get('reasoningContent')
+        if reasoning_text:
+            print( '<<<Thinking>>>' )
+            print( reasoning_text )
+
     def dump_message( self, message ):
         role= message.get( 'role', '<UNKNOWN>' )
         content_list= message.get( 'content', [] )
-        print( '----- Role:[%s]' % role )
+        print( '----- Role:[%s] -----' % role )
         for content in content_list:
             if 'text' in content:
+                print( '<<<Text>>>' )
                 print( content['text'] )
+            elif 'reasoningContent' in content:
+                print( '<<<Thinking>>>' )
+                text= content['reasoningContent']['reasoningText']['text']
+                print( text )
             elif 'toolUse' in content:
-                print( 'toolUse' )
-                self.dump_object( '', content['toolUse'], set() )
+                tool_use= content['toolUse']
+                print( ' * 🛠️toolUse: "%s" (id:%s)' % (tool_use['name'],tool_use['toolUseId']), tool_use['input'] )
             elif 'toolResult' in content:
-                print( 'toolResult' )
-                for result in content['toolResult']['content']:
-                    print( result['text'] )
+                tool_result= content['toolResult']
+                tool_call_id= tool_result['toolUseId']
+                for result in tool_result['content']:
+                    name= ''
+                    print( '<<<toolResult "%s" (id:%s) >>>' % (name,tool_call_id)  )
+                    text= result['text']
+                    print( text )
             else:
                 print( content )
                 print( '---' )
@@ -232,10 +271,19 @@ class BedrockAPI:
         self.dump_object( '*', message, ignore_set )
 
     def dump_response( self, response ):
-        if 'message' in response:
-            self.dump_message( response['message'] )
-        ignore_set= set( ['message'] )
+        print( '================= Response =================' )
+        if 'output' in response:
+            output= response['output']
+            self.dump_message( output['message'] )
+        ignore_set= set( ['output'] )
         self.dump_object( '+', response, ignore_set )
+        print( '============================================', flush=True )
+
+    def dump_message_list( self, message_list ):
+        print( '=============== SendMessages ===============' )
+        for message in message_list:
+            self.dump_message( message )
+        print( '============================================', flush=True )
 
     #--------------------------------------------------------------------------
 

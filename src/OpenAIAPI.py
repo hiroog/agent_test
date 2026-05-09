@@ -161,6 +161,112 @@ class OpenAIAPI:
 
     #--------------------------------------------------------------------------
 
+    def chat2_1( self, session, options ):
+        message_list= session.get_messages()
+        if options.debug_echo:
+            self.manager.dump_message_list( 'SendMessages', message_list )
+        params= {
+            'model': options.model,
+            'messages': message_list,
+        }
+        if options.tool_info_list != []:
+            params['tools']= options.tool_info_list
+        base_url= options.base_url
+        if options.base_url[-1] == '/':
+            base_url= base_url[:-1]
+        if base_url.endswith( 'v1' ):
+            api_url= base_url + '/chat/completions'
+        else:
+            api_url= base_url + '/v1/chat/completions'
+        data= json.dumps( params )
+        if options.temperature >= 0.0:
+            params['temperature']= options.temperature
+        if options.top_k > 0:
+            params['top_k']= options.top_k
+        if options.top_p > 0.0:
+            params['top_p']= options.top_p
+        if options.min_p >= 0.0:
+            params['min_p']= options.min_p
+        if options.presence_penalty >= -2.0:
+            params['presence_penalty']= options.presence_penalty
+        if options.frequency_penalty >= -2.0:
+            params['frequency_penalty']= options.frequency_penalty
+        if options.max_tokens > 0:
+            params['max_tokens']= options.max_tokens
+        if options.debug_echo:
+            dump_params= {}
+            for key in params:
+                if key != 'messages' and key != 'tools':
+                    dump_params[key]= params[key]
+            print( 'options=', dump_params, flush=True )
+        headers= {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer %s' % os.environ.get('OPENAI_API_KEY', 'lm-studio'),
+        }
+        try:
+            start_time= time.perf_counter()
+            result= requests.post( api_url, headers=headers, data=data, timeout=options.timeout, verify=options.verify )
+            request_time= time.perf_counter() - start_time
+        except Exception as e:
+            print( 'err-url:',api_url )
+            print( 'err-datasize:',len(data) )
+            print( str(e), flush=True )
+            return  '',408
+        if result.status_code == 200:
+            data= result.json()
+            if options.debug_echo:
+                self.manager.dump_response( data )
+            if 'usage' in data:
+                usage= data['usage']
+                self.manager.stat_add( usage.get('completion_tokens',0), usage.get('prompt_tokens',0), request_time )
+            if 'error' in data:
+                return  { 'role': 'assistant', 'content': data['error'] },200
+            message= data['choices'][0]['message']
+            return  message,result.status_code
+        else:
+            print( 'err-url:',api_url )
+            print( 'err-datasize:',len(data) )
+            print( 'Error: %d' % result.status_code, flush=True )
+        return  None,result.status_code
+
+    def chat2( self, session, options ):
+        response= ''
+        content= ''
+        status_code= 408
+        while True:
+            message,status_code= self.chat2_1( session, options )
+            if status_code != 200:
+                return  '',status_code
+            message_list.append( message )
+            role= message['role']
+            if role == 'assistant':
+                content= message.get('content')
+                tool_calls= message.get('tool_calls')
+                reasoning= message.get('content')
+                session.add( role, content, tool_calls, reasoning )
+                if content and content.strip() != '':
+                    response+= content + '\n'
+                if tool_calls:
+                    for tool_call in tool_calls:
+                        tool_call_id= tool_call['id']
+                        function= tool_call['function']
+                        func_name= function['name']
+                        arguments= json.loads(function['arguments'])
+                        data= ''
+                        if options.tools:
+                            print( '**TOOLCALL**:', func_name, arguments, flush=True )
+                            data= options.tools.call_func( func_name, arguments, options.tool_env )
+                        session.add_result( data, func_name, tool_call_id )
+                        if options.response_all:
+                            response+= '\U0001f527 toolcall: %s\n' % func_name
+                    continue
+            break
+        if not options.response_all:
+            response= content
+        return  response,status_code
+
+    #--------------------------------------------------------------------------
+
     def generate( self, text, system= None, image_data= None ):
         params= {
             'model': self.options.model,

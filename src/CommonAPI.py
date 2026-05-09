@@ -108,6 +108,53 @@ class ExecTime:
 
 #------------------------------------------------------------------------------
 
+class Session:
+    def __init__( self ):
+        self.message_list= []
+        self.system= None
+        self.toolbox= None
+
+    def set_system( self, text ):
+        self.system= { 'role': 'system', 'content': text }
+
+    def add( self, role, text, tool_calls= None, reasoning= None ):
+        message= { 'role': role }
+        if text:
+            message['content']= text
+        if tool_calls:
+            message['tool_calls']= tool_calls
+        if reasoning:
+            message['reasoning']= reasoning
+        self.message_list.append( message )
+
+    def add_result( self, text, name, tool_id ):
+        message= {
+                'role': 'tool',
+                'name': name,
+                'tool_call_id': tool_id,
+              }
+        self.message_list.append( message )
+
+    def get_messages( self, json_args= False ):
+        message_list= []
+        if self.system:
+            message_list.append( self.system )
+        message_list.extend( self.message_list )
+        if json_args:
+            for message in message_list:
+                role= message['role']
+                if role == 'assistant':
+                    if 'tool_calls' in message:
+                        tool_calls= message['tool_calls']
+                        for tool_call in tool_calls:
+                            func= tool_call['function']
+                            arg= func['arguments']
+                            func['arguments']= json.dumps( arg )
+        return  message_list
+
+
+#------------------------------------------------------------------------------
+
 class CommonOptions(OptionBase):
     def __init__( self, **args ):
         super().__init__()
@@ -125,6 +172,7 @@ class CommonOptions(OptionBase):
         self.presence_penalty= -9.0
         self.frequency_penalty= -9.0
         self.remove_think= False
+        self.reasoning= 'default'   # off or default
         self.response_all= False
         self.debug_echo= False
         self.verify= True
@@ -204,6 +252,12 @@ class CommonAPI:
         api= self.load_api( options.provider, options )
         if api:
             return  api.chat( text, system, image_data, message_list, options )
+        return  'Unknown provider: %s' % provider,400
+
+    def generate2( self, session, options ):
+        api= self.load_api( options.provider, options )
+        if api:
+            return  api.chat2( session, options )
         return  'Unknown provider: %s' % provider,400
 
     #--------------------------------------------------------------------------
@@ -289,7 +343,7 @@ class CommonAPI:
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'CommonAPI v4.42 Hiroyuki Ogasawara' )
+    print( 'CommonAPI v5.00 Hiroyuki Ogasawara' )
     print( 'usage: CommonAPI [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --host <base_url>' )
