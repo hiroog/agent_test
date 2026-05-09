@@ -106,9 +106,10 @@ class BedrockAPI:
             inferenceConfig['topP']= options.top_p
         if options.max_tokens > 0:
             inferenceConfig['maxTokens']= options.max_tokens
-        if options.reasoning != 'off':
-            tokens= { 'default': 4096 }
-            additionalModelRequestFields['thinking']= { 'type': 'enabled', 'budget_tokens': tokens.get(options.reasoning,1024) }
+        if options.reasoning:
+            if options.reasoning != 'off':
+                tokens= { 'low': 1024, 'medium': 2048, 'high': 4096 }
+                additionalModelRequestFields['thinking']= { 'type': 'enabled', 'budget_tokens': tokens.get(options.reasoning,2048) }
         if options.debug_echo:
             print( 'options=', inferenceConfig, additionalModelRequestFields, flush=True )
 

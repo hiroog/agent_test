@@ -173,6 +173,104 @@ class OllamaAPI:
 
     #--------------------------------------------------------------------------
 
+    def chat2_1( self, session, options ):
+        message_list= session.get_messages()
+        if options.debug_echo:
+            self.manager.dump_message_list( 'SendMessages', message_list )
+        params= {
+            'model': options.model,
+            'messages': message_list,
+            'stream': options.streaming,
+            'options': {
+                'num_ctx': options.num_ctx,
+            },
+        }
+        if options.tool_info_list != []:
+            params['tools']= options.tool_info_list
+        if options.reasoning:
+            params['think']= options.reasoning
+        if options.temperature >= 0.0:
+            params['options']['temperature']= options.temperature
+        if options.top_k > 0:
+            params['options']['top_k']= options.top_k
+        if options.top_p > 0.0:
+            params['options']['top_p']= options.top_p
+        if options.min_p >= 0.0:
+            params['options']['min_p']= options.min_p
+        if options.max_tokens > 0:
+            params['options']['num_predict']= options.max_tokens
+        data= json.dumps( params )
+        if options.debug_echo:
+            print( 'options=', params['options'], flush=True )
+        api_url= options.base_url + '/api/chat'
+        headers= {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer %s' % os.environ.get('OLLAMA_API_KEY', os.environ.get( 'OPENAI_API_KEY', None) ),
+        }
+        try:
+            start_time= time.perf_counter()
+            result= requests.post( api_url, headers=headers, data=data, timeout=options.timeout, verify=options.verify )
+            request_time= time.perf_counter() - start_time
+        except Exception as e:
+            print( 'err-url:',api_url )
+            print( 'err-datasize:',len(data) )
+            print( str(e), flush=True )
+            return  None,408
+        if result.status_code == 200:
+            if streaming:
+                data= self.decode_streaming( result )
+            else:
+                data= result.json()
+            if options.debug_echo:
+                self.manager.dump_response( data )
+            self.manager.stat_add( data.get('eval_count',0), data.get('prompt_eval_count',0), request_time )
+            message= data['message']
+            return  message,result.status_code
+        else:
+            print( 'err-url:',api_url )
+            print( 'err-datasize:',len(data) )
+            print( 'Error: %d' % result.status_code, flush=True )
+        return  None,result.status_code
+
+    def chat2( self, session, options ):
+        response= ''
+        content= ''
+        status_code= 408
+        while True:
+            message,status_code= self.chat2_1( session, options )
+            if status_code != 200:
+                return  '',status_code
+            role= message['role']
+            content= message.get('content')
+            tool_calls= message.get( 'tool_calls' )
+            reasoning= message.get('thinking')
+            session.add( role, content, tool_calls, reasoning )
+            if role == 'assistant':
+                if content and content.strip() != '':
+                    response+= content + '\n'
+                if tool_calls:
+                    for tool_call in tool_calls:
+                        tool_call_id= tool_call['id']
+                        function= tool_call['function']
+                        func_name= function['name']
+                        arguments= function['arguments']
+                        data= ''
+                        if options.tools:
+                            print( '**TOOLCALL**:', func_name, arguments, flush=True )
+                            data= options.tools.call_func( func_name, arguments, options.tool_env )
+                        session.add_result( data, func_name, tool_call_id )
+                        if options.response_all:
+                            response+= '\U0001f527 toolcall: %s\n' % func_name
+                    continue
+            break
+        if not options.response_all:
+            response= content
+        if options.remove_think:
+            response= self.remove_think_tag( response )
+        return  response,status_code
+
+    #--------------------------------------------------------------------------
+
     def generate( self, text, system= None, image_data= None ):
         params= {
             'model': self.options.model,

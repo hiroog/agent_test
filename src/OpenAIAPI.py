@@ -171,13 +171,6 @@ class OpenAIAPI:
         }
         if options.tool_info_list != []:
             params['tools']= options.tool_info_list
-        base_url= options.base_url
-        if options.base_url[-1] == '/':
-            base_url= base_url[:-1]
-        if base_url.endswith( 'v1' ):
-            api_url= base_url + '/chat/completions'
-        else:
-            api_url= base_url + '/v1/chat/completions'
         data= json.dumps( params )
         if options.temperature >= 0.0:
             params['temperature']= options.temperature
@@ -199,6 +192,13 @@ class OpenAIAPI:
                 if key != 'messages' and key != 'tools':
                     dump_params[key]= params[key]
             print( 'options=', dump_params, flush=True )
+        base_url= options.base_url
+        if options.base_url[-1] == '/':
+            base_url= base_url[:-1]
+        if base_url.endswith( 'v1' ):
+            api_url= base_url + '/chat/completions'
+        else:
+            api_url= base_url + '/v1/chat/completions'
         headers= {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer %s' % os.environ.get('OPENAI_API_KEY', 'lm-studio'),
@@ -237,13 +237,12 @@ class OpenAIAPI:
             message,status_code= self.chat2_1( session, options )
             if status_code != 200:
                 return  '',status_code
-            message_list.append( message )
             role= message['role']
+            content= message.get('content')
+            tool_calls= message.get('tool_calls')
+            reasoning= message.get('reasoning')
+            session.add( role, content, tool_calls, reasoning )
             if role == 'assistant':
-                content= message.get('content')
-                tool_calls= message.get('tool_calls')
-                reasoning= message.get('content')
-                session.add( role, content, tool_calls, reasoning )
                 if content and content.strip() != '':
                     response+= content + '\n'
                 if tool_calls:

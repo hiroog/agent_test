@@ -135,23 +135,28 @@ class Session:
               }
         self.message_list.append( message )
 
-    def get_messages( self, json_args= False ):
+    def fix_args( self, dict_args= False ):
+        for message in self.message_list:
+            role= message['role']
+            if role == 'assistant':
+                if 'tool_calls' in message:
+                    tool_calls= message['tool_calls']
+                    for tool_call in tool_calls:
+                        func= tool_call['function']
+                        arg= func['arguments']
+                        if dict_args:
+                            if type(arg) is str:
+                                func['arguments']= json.loads( arg )
+                        else:
+                            if type(arg) is dict:
+                                func['arguments']= json.dumps( arg )
+
+    def get_messages( self ):
         message_list= []
         if self.system:
             message_list.append( self.system )
         message_list.extend( self.message_list )
-        if json_args:
-            for message in message_list:
-                role= message['role']
-                if role == 'assistant':
-                    if 'tool_calls' in message:
-                        tool_calls= message['tool_calls']
-                        for tool_call in tool_calls:
-                            func= tool_call['function']
-                            arg= func['arguments']
-                            func['arguments']= json.dumps( arg )
         return  message_list
-
 
 #------------------------------------------------------------------------------
 
@@ -172,7 +177,8 @@ class CommonOptions(OptionBase):
         self.presence_penalty= -9.0
         self.frequency_penalty= -9.0
         self.remove_think= False
-        self.reasoning= 'default'   # off or default
+        self.reasoning= None        # on, off, default, low, medium, high
+        self.streaming= False
         self.response_all= False
         self.debug_echo= False
         self.verify= True

@@ -122,7 +122,12 @@ class AssistantOptions(CommonAPI.CommonOptions):
 
 class Assistant:
 
-    MERGE_KEY_LIST= [ 'base_url', 'provider', 'model', 'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'presence_penalty', 'frequency_penalty', 'env', 'base_prompt', 'system_prompt', 'header', 'verify' ]
+    MERGE_KEY_LIST= [
+            'base_url', 'provider', 'model', 'verify'
+            'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'presence_penalty', 'frequency_penalty', 'max_tokens',
+            'env', 'base_prompt', 'system_prompt', 'header',
+            'reasoning', 'streaming',
+            ]
 
     def __init__( self, options ):
         self.config= self.load_file( options.config_file )
