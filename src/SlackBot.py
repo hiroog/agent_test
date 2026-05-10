@@ -12,7 +12,7 @@ lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
 import Assistant
-from CommonAPI import ExecTime
+import CommonAPI
 from SlackAPI import save_json, load_json
 
 # env:
@@ -67,7 +67,6 @@ class ThreadCache:
     def __init__( self ):
         self.lock= threading.Lock()
         self.thread_map= {}
-        self.thread_lock_map= {}
         if not os.path.exists( self.THREAD_CACHE_DIR ):
             os.mkdir( self.THREAD_CACHE_DIR )
 
@@ -81,14 +80,18 @@ class ThreadCache:
             p,_= os.path.split( save_file_name )
             if not os.path.exists( p ):
                 os.makedirs( p )
-            save_json( save_file_name, self.thread_map[thread_id] )
+            session= self.thread_map[thread_id]
+            session.save_session( save_file_name )
 
     def has_thread_0( self, thread_id ):
         if thread_id in self.thread_map:
             return  True
         thread_file= self.get_thread_file_name( thread_id )
         if os.path.exists( thread_file ):
-            self.thread_map[thread_id]= load_json( thread_file )
+            session= CommonAPI.Session( thread_id )
+            session.load_session( thread_file )
+            session.lock= threading.Lock()
+            self.thread_map[thread_id]= session
             return  True
         return  False
 
@@ -99,18 +102,20 @@ class ThreadCache:
     def has_message( self, thread_id, msg_id ):
         with self.lock:
             if self.has_thread_0( thread_id ):
-                thread_info= self.thread_map[thread_id]
-                if thread_info.get('msg_id','') == msg_id:
+                session= self.thread_map[thread_id]
+                if session.get_info().get('msg_id','') == msg_id:
                     return  True
             return  False
 
-    def get_thread_info( self, thread_id ):
+    def get_session( self, thread_id ):
         with self.lock:
             if not self.has_thread_0( thread_id ):
-                self.thread_map[thread_id]= { 'thread_id': thread_id, 'message_list': [], 'date': ExecTime().get_date(), 'mtime': '', 'msg_id': '' }
-            if thread_id not in self.thread_lock_map:
-                self.thread_lock_map[thread_id]= threading.Lock()
-            return  self.thread_map[thread_id],self.thread_lock_map[thread_id]
+                session= CommonAPI.Session( thread_id )
+                session.get_info()['date']= CommonAPI.ExecTime().get_date()
+                session.lock= threading.Lock()
+                self.thread_map[thread_id]= session
+                #{ 'thread_id': thread_id, 'message_list': [], 'date': ExecTime().get_date(), 'mtime': '', 'msg_id': '' }
+            return  self.thread_map[thread_id]
 
 
 #------------------------------------------------------------------------------
@@ -149,22 +154,24 @@ class SlackBot:
         # msg_id = 同一メッセージかどうか判定する場合のみ必要。不要なら ''
         # msg_info = スレッド(セッション)ログに記録したい情報。不要なら {}
     def bot( self, thread_id, prompt, msg_id, msg_info ):
-        with ExecTime( 'Generate' ):
-            thread_info,thread_lock= self.thread_cache.get_thread_info( thread_id )
-            with thread_lock:
-                thread_info['mtime']= ExecTime().get_date()
-                thread_info['msg_id']= msg_id
-                message_list= thread_info['message_list']
-                input_obj= {
-                    'prompt': prompt,
-                }
+        with CommonAPI.ExecTime( 'Generate' ):
+            session= self.thread_cache.get_session( thread_id )
+            with session.get_lock():
+                session.get_info()['mtime']= CommonAPI.ExecTime().get_date()
+                session.get_info()['msg_id']= msg_id
+                session.get_info().update( msg_info )
+                #session.push_user( prompt )
                 try:
                     if True:
-                        response,status_code,local_options= self.assistant.generate_text( input_obj, None, message_list )
-                        local_options.tools= ''
-                        local_options.tool_env= local_options.tool_env.to_dict()
-                        thread_info['options']= local_options.__dict__
-                        thread_info['msg_info']= msg_info
+                        #response,status_code,local_options= self.assistant.generate_text( input_obj, None, message_list )
+                        input_obj= {
+                            'prompt': prompt
+                        }
+                        response,status_code,session= self.assistant.generate_text2( input_obj, session )
+                        #local_options.tools= ''
+                        #local_options.tool_env= local_options.tool_env.to_dict()
+                        #thread_info['options']= local_options.__dict__
+                        #thread_info['msg_info']= msg_info
                         if status_code != 200:
                             response= '\nserver error: %d\n' % status_code
                     else:

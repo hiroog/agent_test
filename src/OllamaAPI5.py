@@ -173,8 +173,9 @@ class OllamaAPI:
 
     #--------------------------------------------------------------------------
 
-    def chat2_1( self, session, options ):
+    def chat2_1( self, session ):
         message_list= session.get_messages()
+        options= session.get_options()
         if options.debug_echo:
             self.manager.dump_message_list( 'SendMessages', message_list )
         params= {
@@ -202,6 +203,12 @@ class OllamaAPI:
         data= json.dumps( params )
         if options.debug_echo:
             print( 'options=', params['options'], flush=True )
+            ignore_set= set( ['messages', 'options', 'tools'] )
+            dump_params= {}
+            for key in params:
+                if key not in ignore_set:
+                    dump_params[key]= params[key]
+            print( 'params=', dump_params )
         api_url= options.base_url + '/api/chat'
         headers= {
             'Content-Type': 'application/json',
@@ -217,7 +224,7 @@ class OllamaAPI:
             print( str(e), flush=True )
             return  None,408
         if result.status_code == 200:
-            if streaming:
+            if options.streaming:
                 data= self.decode_streaming( result )
             else:
                 data= result.json()
@@ -232,36 +239,40 @@ class OllamaAPI:
             print( 'Error: %d' % result.status_code, flush=True )
         return  None,result.status_code
 
-    def chat2( self, session, options ):
+    def chat2( self, session ):
+        options= session.get_options()
+        toolbox= session.get_toolbox()
+        session.fix_messages( True, 'thinking' ) # json to dict
         response= ''
         content= ''
         status_code= 408
         while True:
-            message,status_code= self.chat2_1( session, options )
+            message,status_code= self.chat2_1( session )
             if status_code != 200:
                 return  '',status_code
             role= message['role']
+            if role != 'assistant':
+                return  f'Unknown role "{role}" error',400
             content= message.get('content')
             tool_calls= message.get( 'tool_calls' )
             reasoning= message.get('thinking')
-            session.add( role, content, tool_calls, reasoning )
-            if role == 'assistant':
-                if content and content.strip() != '':
-                    response+= content + '\n'
-                if tool_calls:
-                    for tool_call in tool_calls:
-                        tool_call_id= tool_call['id']
-                        function= tool_call['function']
-                        func_name= function['name']
-                        arguments= function['arguments']
-                        data= ''
-                        if options.tools:
-                            print( '**TOOLCALL**:', func_name, arguments, flush=True )
-                            data= options.tools.call_func( func_name, arguments, options.tool_env )
-                        session.add_result( data, func_name, tool_call_id )
-                        if options.response_all:
-                            response+= '\U0001f527 toolcall: %s\n' % func_name
-                    continue
+            session.push_assistant( content, tool_calls, reasoning, 'thinking' )
+            if content and content.strip() != '':
+                response+= content + '\n'
+            if tool_calls:
+                for tool_call in tool_calls:
+                    tool_call_id= tool_call['id']
+                    function= tool_call['function']
+                    func_name= function['name']
+                    arguments= function['arguments']
+                    data= ''
+                    if toolbox:
+                        print( '**TOOLCALL**:', func_name, arguments, flush=True )
+                        data= toolbox.call_func( func_name, arguments, session.get_tool_env() )
+                    session.push_result( data, func_name, tool_call_id )
+                    if options.response_all:
+                        response+= '\U0001f527 toolcall: %s\n' % func_name
+                continue
             break
         if not options.response_all:
             response= content

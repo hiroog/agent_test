@@ -19,12 +19,15 @@ import SlackBot
 
 class SlackCLI:
     def __init__( self, options ):
+        self.options= options
         self.bot= SlackBot.SlackBot( options )
 
     #--------------------------------------------------------------------------
     # Debug CLI
 
     def get_thread_id( self ):
+        if self.options.load_session:
+            return  self.options.load_session
         t= time.time()
         thread_id= time.strftime( 'cli_%Y%m%d_%H%M%S', time.localtime(t) )
         f= t-math.floor(t)
@@ -64,6 +67,7 @@ def usage():
     print( '  --host <base_url>' )
     print( '  --provider <provider>' )
     print( '  --model <model>' )
+    print( '  --load <thread_id>' )
     print( '  --print' )
     print( '  --debug' )
     sys.exit( 1 )
@@ -71,7 +75,7 @@ def usage():
 
 def main( argv ):
     acount= len(argv)
-    options= SlackBot.SlackBotOptions( prompt_text= None )
+    options= SlackBot.SlackBotOptions( prompt_text= None, load_session= None )
     ai= 1
     while ai < acount:
         arg= argv[ai]
@@ -90,6 +94,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'provider' )
             elif arg == '--model':
                 ai= options.set_str( ai, argv, 'model' )
+            elif arg == '--load':
+                ai= options.set_str( ai, argv, 'load_session' )
             elif arg == '--noverify':
                 options.verify= False
             elif arg == '--print':

@@ -106,11 +106,13 @@ class AssistantOptions(CommonAPI.CommonOptions):
         self.system_prompt= None
         self.header= ''
         self.tool_env= Functions.ToolEnv()
+        self.tool_env= None
         self.apply_params( args )
 
     def copy_from( self, src ):
         super().copy_from( src )
-        self.tool_env= Functions.ToolEnv( src.tool_env.to_dict() )
+        if src.tool_env:
+            self.tool_env= Functions.ToolEnv( src.tool_env.to_dict() )
         return  self
 
     def set_env( self, env_list ):
@@ -135,7 +137,7 @@ class Assistant:
         options.tools.debug_echo= options.debug_echo
         self.options= options
         self.options.merge_params( self.config, self.MERGE_KEY_LIST )
-        options.set_env( self.options.env )
+        #options.set_env( self.options.env )
         self.common_api= CommonAPI.CommonAPI( options )
         self.import_inline_modules()
 
@@ -242,6 +244,50 @@ class Assistant:
 
     #--------------------------------------------------------------------------
 
+    def generate_text2( self, input_obj, session= None ):
+        if session is None:
+            session= CommonAPI.Session()
+            session.tool_env= Functions.ToolEnv()
+
+        prompt= input_obj.get( 'prompt', '' )
+
+        is_root= session.is_root()
+        options= session.get_options()
+        if is_root or (options is None):
+            preset_name= input_obj.get( 'preset', self.options.preset )
+            options= self.load_preset2( preset_name, is_root )
+            session.set_options( options )
+
+            if is_root:
+                system= input_obj.get( 'system', '' )
+                if options.system_prompt:
+                    system= options.system_prompt + '\n' + system
+                if system.strip() != '':
+                    session.set_system( system )
+                if options.base_prompt:
+                    prompt= options.base_prompt + '\n' + prompt
+
+        session.push_user( prompt )
+        if 'model' in input_obj:
+            options.model= input_obj['model']
+        options.prompt= prompt
+        session.set_env( self.options.env )
+        session.set_env( options.env )
+        if 'env' in input_obj:
+            session.set_env( input_obj['env'] )
+        header_text= input_obj.get( 'header', options.header )
+
+        response,status_code= self.common_api.generate2( session )
+        if status_code != 200:
+            print( 'Generate Error: %d' % status_code, flush=True )
+            return  response,status_code,session
+        if len(response) >= 1 and response[-1] != '\n':
+            response+= '\n'
+        response= header_text + response
+        return  response,status_code,session
+
+    #--------------------------------------------------------------------------
+
     def stat_dump( self ):
         self.common_api.stat_dump()
 
@@ -294,13 +340,61 @@ class Assistant:
             if self.options.debug_echo:
                 self.stat_dump()
 
+    def f_post_or_save2( self ):
+        with CommonAPI.ExecTime( 'Assistant' ):
+            if self.options.channel:
+                token= os.environ.get( 'SLACK_API_TOKEN', None )
+                if token is None:
+                    print( 'SLACK_API_TOKEN must be set in the environment' ) 
+                    return
+            input_obj= None
+            if self.options.input_file:
+                input_obj= self.load_file( self.options.input_file )
+                if input_obj is None:
+                    print( 'Input file not found:', self.options.input_file )
+                    return
+            else:
+                input_obj= { 'prompt':'' }
+            response,status_code,session= self.generate_text2( input_obj )
+            if status_code != 200:
+                return
+            if self.options.channel:
+                api= SlackAPI.SlackAPI( token=token, nossl=self.options.nossl )
+                channel_name= self.options.channel
+                thread_ts= None
+                if ':' in channel_name:
+                    params= channel_name.split(':')
+                    channel_name= params[0]
+                    thread_ts= params[1]
+                print( 'channel:', channel_name )
+                print( 'thrad_ts:', thread_ts, flush=True )
+                api.post_message(
+                            channel_name,
+                            text=response,
+                            blocks= [
+                                {
+                                    'type': 'markdown',
+                                    'text': response
+                                }
+                            ],
+                            thread_ts=thread_ts
+                        )
+                api.save_cache()
+            if self.options.output_text:
+                with open( self.options.output_text, 'w', encoding='utf-8' ) as fo:
+                    fo.write( response )
+            if self.options.print:
+                print( '** INPUT\n', session.get_options().prompt )
+                print( '\n** RESPONSE\n', response, flush=True )
+            if self.options.debug_echo:
+                self.stat_dump()
     #--------------------------------------------------------------------------
 
 
 #------------------------------------------------------------------------------
 
 def usage():
-    print( 'Assistant v1.34 Hiroyuki Ogasawara' )
+    print( 'Assistant v1.35 Hiroyuki Ogasawara' )
     print( 'usage: Assistant [<options>] [<message..>]' )
     print( 'options:' )
     print( '  --preset <preset>' )
@@ -374,7 +468,7 @@ def main( argv ):
 
     if run_flag:
         api= Assistant( options )
-        api.f_post_or_save()
+        api.f_post_or_save2()
     else:
         usage()
 

@@ -10,6 +10,7 @@ import datetime
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
+from Functions import ToolEnv
 
 #------------------------------------------------------------------------------
 # {
@@ -108,48 +109,98 @@ class ExecTime:
 
 #------------------------------------------------------------------------------
 
+def save_json( file_name, message_obj ):
+    if os.path.exists( file_name ):
+        file_name_bak= file_name+'.bak'
+        if os.path.exists( file_name_bak ):
+            os.remove( file_name_bak )
+        os.rename( file_name, file_name_bak )
+    with open( file_name, 'w', encoding='utf-8' ) as fo:
+        fo.write( json.dumps( message_obj, indent=4, ensure_ascii=False ) )
+
+def load_json( file_name ):
+    if os.path.exists( file_name ):
+        with open( file_name, 'r', encoding='utf-8', errors='ignore' ) as fi:
+            return  json.loads( fi.read() )
+    return  None
+
+#------------------------------------------------------------------------------
+
 class Session:
-    def __init__( self ):
+    REASONING_TAGS= [ 'reasoning', 'reasoning_content', 'thinking' ]
+
+    def __init__( self, session_id= None ):
+        self.session_id= session_id
         self.message_list= []
         self.system= None
+        self.options= None
+        self.msg_info= {}
         self.toolbox= None
+        self.tool_env= ToolEnv()
+        self.lock= None
+
+    def is_root( self ):
+        return  self.message_list == []
+
+    def get_info( self ):
+        return  self.msg_info
+
+    def get_lock( self ):
+        return  self.lock
+
+    #--------------------------------------------------------------------------
+
+    def get_options( self ):
+        return  self.options
+
+    def set_options( self, options ):
+        self.options= options
+        self.toolbox= options.tools
+        #self.toolenv= options.tool_env
+        options.tools= None
+        options.tool_env= None
+
+    #--------------------------------------------------------------------------
+
+    def get_toolbox( self ):
+        return  self.toolbox
+
+    #--------------------------------------------------------------------------
+
+    def get_tool_env( self ):
+        return  self.tool_env
+
+    def set_env( self, env_list ):
+        for name in env_list:
+            params= name.split( '=', 1 )
+            self.tool_env.set( params[0], params[1] )
+
+    #--------------------------------------------------------------------------
 
     def set_system( self, text ):
         self.system= { 'role': 'system', 'content': text }
 
-    def add( self, role, text, tool_calls= None, reasoning= None ):
-        message= { 'role': role }
-        if text:
+    def push_user( self, text ):
+        self.message_list.append( { 'role': 'user', 'content': text } )
+
+    def push_assistant( self, text, tool_calls, reasoning, reasoning_tag= None ):
+        message= { 'role': 'assistant' }
+        if reasoning is not None:
+            message[reasoning_tag]= reasoning
+        if text is not None:
             message['content']= text
-        if tool_calls:
+        if tool_calls is not None:
             message['tool_calls']= tool_calls
-        if reasoning:
-            message['reasoning']= reasoning
         self.message_list.append( message )
 
-    def add_result( self, text, name, tool_id ):
+    def push_result( self, text, name, tool_id ):
         message= {
                 'role': 'tool',
                 'name': name,
                 'tool_call_id': tool_id,
+                'content': text,
               }
         self.message_list.append( message )
-
-    def fix_args( self, dict_args= False ):
-        for message in self.message_list:
-            role= message['role']
-            if role == 'assistant':
-                if 'tool_calls' in message:
-                    tool_calls= message['tool_calls']
-                    for tool_call in tool_calls:
-                        func= tool_call['function']
-                        arg= func['arguments']
-                        if dict_args:
-                            if type(arg) is str:
-                                func['arguments']= json.loads( arg )
-                        else:
-                            if type(arg) is dict:
-                                func['arguments']= json.dumps( arg )
 
     def get_messages( self ):
         message_list= []
@@ -157,6 +208,78 @@ class Session:
             message_list.append( self.system )
         message_list.extend( self.message_list )
         return  message_list
+
+    #--------------------------------------------------------------------------
+
+    def fix_messages( self, to_dict, reasoning_tag ):
+        print( '$$$$$$$$$$$$$ FIX ARGS $$$$$$$$$$$$$' )
+        prev_message= None
+        prev_role= None
+        for message in self.message_list:
+            role= message['role']
+            if role == 'assistant':
+                if 'tool_calls' in message:
+                    tool_calls= message['tool_calls']
+                    for tool_call in tool_calls:
+                        if 'type' not in tool_call:
+                            tool_call['type']= 'function'
+                            print( '  $$ INSERT FUNCTION-TYPE $$' )
+                        func= tool_call['function']
+                        arg= func['arguments']
+                        if to_dict:
+                            if type(arg) is str:
+                                func['arguments']= json.loads( arg )
+                                print( '  $$ CONVERT ARG to Dict $$' )
+                        else:
+                            if type(arg) is dict:
+                                func['arguments']= json.dumps( arg )
+                                print( '  $$ CONVERT ARG to Json $$' )
+                if 'content' not in message:
+                    message['content']= '\n\n'
+                for tag in self.REASONING_TAGS:
+                    if tag in message:
+                        if tag != reasoning_tag:
+                            print( '  $$ CONVERT TAG %s to %s $$' % (tag, reasoning_tag) )
+                            message[reasoning_tag]= message[tag]
+                            del message[tag]
+            elif role == 'user':
+                if prev_role == 'user':
+                    print( '  $$ MERGE USER MESSAGE $$' )
+                    prev_message['content']+= '\n' + message['content']
+                    message['content']= ''
+                    message['role']= None
+                    continue
+            prev_role= role
+            prev_message= message
+        fixed_message_list= []
+        for message in self.message_list:
+            if message['role'] is not None:
+                fixed_message_list.append( message )
+            else:
+                print( '  $$ DELETE MESSAGE $$' )
+        self.message_list= fixed_message_list
+
+    #--------------------------------------------------------------------------
+
+    def save_session( self, file_name ):
+        save_json( file_name, {
+                    'session_id': self.session_id,
+                    'message_list': self.message_list,
+                    'system': self.system,
+                    'options': self.options.__dict__,
+                    'msg_info': self.msg_info,
+                    'tool_env': self.tool_env.to_dict(),
+                } )
+
+    def load_session( self, file_name ):
+        obj= load_json( file_name )
+        if obj:
+            self.session_id= obj.get('session_id')
+            self.message_list= obj.get('message_list',[])
+            self.system= obj.get('system')
+            self.options= None
+            self.msg_info= obj.get('msg_info',{})
+            self.tool_env= ToolEnv( obj.get('tool_env',{}) )
 
 #------------------------------------------------------------------------------
 
@@ -260,10 +383,11 @@ class CommonAPI:
             return  api.chat( text, system, image_data, message_list, options )
         return  'Unknown provider: %s' % provider,400
 
-    def generate2( self, session, options ):
+    def generate2( self, session ):
+        options= session.get_options()
         api= self.load_api( options.provider, options )
         if api:
-            return  api.chat2( session, options )
+            return  api.chat2( session )
         return  'Unknown provider: %s' % provider,400
 
     #--------------------------------------------------------------------------
@@ -297,13 +421,16 @@ class CommonAPI:
             print( content )
 
     def dump_reasoning( self, message ):
+        reasoning_tag= 'reasoning_content'
         reasoning_text= message.get('reasoning_content')
         if not reasoning_text:
+            reasoning_tag= 'reasoning'
             reasoning_text= message.get('reasoning')
         if not reasoning_text:
+            reasoning_tag= 'thinking'
             reasoning_text= message.get('thinking')
         if reasoning_text:
-            print( '<<<Thinking>>>' )
+            print( '<<<Thinking "%s">>>' % reasoning_tag )
             print( reasoning_text )
 
     def dump_content( self, message ):

@@ -265,12 +265,13 @@ class CodeAnalyzer:
         issue_list= IssueList()
 
         with ExecTime( 'Generate' ):
-            response,status_code,local_options= self.assistant.generate_chain( input_obj )
+            response,status_code,session= self.assistant.generate_text2( input_obj )
+            local_options= session.get_options()
 
         if status_code != 200:
             return  False
 
-        self.save_logs( response, local_options.first_prompt, file_list, issue_list )
+        self.save_logs( response, local_options.prompt, file_list, issue_list )
         return  True
 
     def analyze( self, file_list ):
