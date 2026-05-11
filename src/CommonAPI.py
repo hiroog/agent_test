@@ -10,7 +10,8 @@ import datetime
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
-from Functions import ToolEnv
+#from Functions import ToolEnv,get_toolbox
+import Functions
 
 #------------------------------------------------------------------------------
 # {
@@ -24,13 +25,14 @@ from Functions import ToolEnv
 # {
 #    'role': 'assistant'
 #    'content': 'text'
-#    'tool_calls': [ .. ]
+#    'reasoning': 'text'
+#    'tool_calls': [ { 'id': 'id', 'function': { 'name':'name', 'arguments': argdict } } .. ]
 # },
 # {
 #    'role': 'tool'
 #    'content': 'text'
 #    'name': 'func'
-#    'tool_call_id': 'func'
+#    'tool_call_id': 'id'
 # },
 
 #------------------------------------------------------------------------------
@@ -129,14 +131,14 @@ def load_json( file_name ):
 class Session:
     REASONING_TAGS= [ 'reasoning', 'reasoning_content', 'thinking' ]
 
-    def __init__( self, session_id= None ):
+    def __init__( self, session_id= None, options=None ):
         self.session_id= session_id
         self.message_list= []
         self.system= None
-        self.options= None
+        self.options= options
         self.msg_info= {}
-        self.toolbox= None
-        self.tool_env= ToolEnv()
+        self.toolbox= Functions.get_toolbox()
+        self.tool_env= Functions.ToolEnv()
         self.lock= None
 
     def is_root( self ):
@@ -155,15 +157,14 @@ class Session:
 
     def set_options( self, options ):
         self.options= options
-        self.toolbox= options.tools
-        #self.toolenv= options.tool_env
-        options.tools= None
-        options.tool_env= None
 
     #--------------------------------------------------------------------------
 
     def get_toolbox( self ):
         return  self.toolbox
+
+    def set_tools( self, tools ):
+        self.options.tool_info_list= self.toolbox.get_tools( tools )
 
     #--------------------------------------------------------------------------
 
@@ -279,7 +280,7 @@ class Session:
             self.system= obj.get('system')
             self.options= None
             self.msg_info= obj.get('msg_info',{})
-            self.tool_env= ToolEnv( obj.get('tool_env',{}) )
+            self.tool_env= Functions.ToolEnv( obj.get('tool_env',{}) )
 
 #------------------------------------------------------------------------------
 
@@ -305,9 +306,9 @@ class CommonOptions(OptionBase):
         self.response_all= False
         self.debug_echo= False
         self.verify= True
-        self.tools= None
+        self.tools= []
         self.tool_info_list= []
-        self.tool_env= os.environ
+        #self.tool_env= os.environ
         self.apply_params( args )
 
 #------------------------------------------------------------------------------

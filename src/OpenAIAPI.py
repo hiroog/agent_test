@@ -241,7 +241,7 @@ class OpenAIAPI:
         while True:
             message,status_code= self.chat2_1( session )
             if status_code != 200:
-                return  '',status_code
+                return  response,status_code
             role= message['role']
             if role != 'assistant':
                 return  f'Unknown role "{role}" error',400
@@ -258,6 +258,7 @@ class OpenAIAPI:
             if content and content.strip() != '':
                 response+= content + '\n'
             if tool_calls:
+                toolresult= False
                 for tool_call in tool_calls:
                     tool_call_id= tool_call['id']
                     function= tool_call['function']
@@ -268,9 +269,11 @@ class OpenAIAPI:
                         print( '**TOOLCALL**:', func_name, arguments, flush=True )
                         data= toolbox.call_func( func_name, arguments, session.get_tool_env() )
                     session.push_result( data, func_name, tool_call_id )
+                    toolresult= True
                     if options.response_all:
                         response+= '\U0001f527 toolcall: %s\n' % func_name
-                continue
+                if toolresult:
+                    continue
             break
         if not options.response_all:
             response= content

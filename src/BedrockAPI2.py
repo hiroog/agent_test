@@ -25,6 +25,8 @@ class BedrockAPI:
         bedrock_tools= []
         for openai_tool in openai_tools:
             openai_func= openai_tool['function']
+            name= openai_func['name']
+            print( f'Convert "{name}" OpenAI to Bedrock' )
             bedrock_func= {
                 'name': openai_func['name'],
                 'description': openai_func['description'],
@@ -77,7 +79,6 @@ class BedrockAPI:
                 pass
             bedrock_message= { 'role': role, 'content': bedrock_content_list }
             bedrock_list.append( bedrock_message )
-
 
     #--------------------------------------------------------------------------
 
@@ -231,6 +232,244 @@ class BedrockAPI:
 
     #--------------------------------------------------------------------------
 
+    def bedrock_to_openai( sefl, message ):
+        role= message['role']
+        if role != 'assistant':
+            return  None
+        openai_message= { 'role': 'assistant' }
+        content_list= message.get( 'content', [] )
+        tool_calls= []
+        for content in content_list:
+            if 'text' in content:
+                text= content['text']
+                openai_message['content']= text
+            elif 'toolUse' in content:
+                tool_use= content['toolUse']
+                tool_call_id= tool_use['toolUseId']
+                name= tool_use['name']
+                arguments= tool_use['input']
+                tool= {
+                        'id': tool_call_id,
+                        'type': 'function',
+                        'function': {
+                                'name': name,
+                                'arguments': arguments,
+                            }
+                    }
+                tool_calls.append( tool )
+            elif 'reasoningContent' in content:
+                text= content['reasoningContent']['reasoningText']['text']
+                openai_message['reasoning']= text
+            if tool_calls != []:
+                openai_message['tool_calls']= tool_calls
+        return  openai_message
+
+    def openai_to_bedrock( sefl, openai_message_list ):
+        bedrock_message_list= []
+        bedrock_system= None
+        prev_tools_result= None
+        for message in openai_message_list:
+            role= message.get('role')
+            if role == 'tool':
+                tool_call_id= message.get( 'tool_call_id', '' )
+                func_name= message.get( 'name', '' )
+                tool_content= message.get( 'content', '' )
+                if not prev_tools_result:
+                    prev_tools_result= []
+                    bedrock_message_list.append( {
+                            'role': 'user',
+                            'content': prev_tools_result
+                        } )
+                prev_tools_result.append( {
+                        'toolResult': {
+                            'toolUseId': tool_call_id,
+                            'content': [ {
+                                    'text': tool_content
+                                } ]
+                        }
+                    } )
+                continue
+            prev_tools_result= None
+            if role == 'user':
+                content= message.get( 'content', '\n\n' )
+                bedrock_message_list.append( {
+                        'role': 'user',
+                        'content': [ {
+                                'text': content
+                            } ]
+                    } )
+                continue
+            if role == 'assistant':
+                content= message.get( 'content', '' )
+                tool_calls= message.get( 'tool_calls' )
+                reasoning= message.get( 'reasoning' )
+                content_list= []
+                if content != '':
+                    content_list.append( {
+                                'text': content
+                            } )
+                if reasoning:
+                    content_list.append( {
+                                'reasoningContent': {
+                                        'reasoningText': {
+                                                'text': reasoning
+                                            }
+                                    }
+                            } )
+                if tool_calls:
+                    for tool_call in tool_calls:
+                        tool_call_id= tool_call.get( 'id', '' )
+                        function= tool_call['function' ]
+                        func_name= function['name']
+                        arguments= function['arguments']
+                        content_list.append( {
+                                'toolUse': {
+                                        'toolUseId': tool_call_id,
+                                        'name': func_name,
+                                        'input': arguments,
+                                    }
+                            } )
+                bedrock_message_list.append( {
+                        'role': 'assistant',
+                        'content': content_list
+                    } )
+                continue
+            if role == 'system':
+                content= message.get( 'content', '' )
+                if content.strip() != '':
+                    bedrock_system= [ {
+                            'text': content
+                        } ]
+                continue
+            print( 'Fatal error: Unknown role "%s"' % role, flush=True )
+        return  bedrock_message_list,bedrock_system
+
+    #--------------------------------------------------------------------------
+
+    def chat2_1( self, session ):
+        openai_message_list= session.get_messages()
+        message_list,system_list= self.openai_to_bedrock( openai_message_list )
+
+        options= session.get_options()
+        if options.debug_echo:
+            #self.manager.dump_message_list( 'SendMessages', openai_message_list )
+            self.dump_message_list( message_list )
+
+        toolConfig= None
+        openai_tools= None
+        if options.tool_info_list != []:
+            openai_tools= options.tool_info_list
+        if openai_tools:
+            toolConfig= {
+                    'tools': self.convert_tools( openai_tools )
+                }
+
+        inferenceConfig= {}
+        additionalModelRequestFields= {}
+        if options.temperature >= 0.0:
+            inferenceConfig['temperature']= options.temperature
+        if options.top_k > 0:
+            additionalModelRequestFields['top_k']= options.top_k
+        if options.top_p > 0.0:
+            inferenceConfig['topP']= options.top_p
+        if options.max_tokens > 0:
+            inferenceConfig['maxTokens']= options.max_tokens
+        if options.reasoning:
+            if options.reasoning != 'off':
+                tokens= { 'low': 1024, 'medium': 2048, 'high': 4096 }
+                additionalModelRequestFields['thinking']= { 'type': 'enabled', 'budget_tokens': tokens.get(options.reasoning,2048) }
+        if options.debug_echo:
+            print( 'options=', inferenceConfig, additionalModelRequestFields, flush=True )
+
+        try:
+            params= {
+                'modelId': options.model,
+                'messages': message_list,
+            }
+            if system_list:
+                params['system']= system_list
+            if toolConfig:
+                params['toolConfig']= toolConfig
+            if inferenceConfig:
+                params['inferenceConfig']= inferenceConfig
+            if additionalModelRequestFields:
+                params['additionalModelRequestFields']= additionalModelRequestFields
+
+            start_time= time.perf_counter()
+            result= self.client.converse( **params )
+            request_time= time.perf_counter() - start_time
+        except Exception as e:
+            print( str(e), flush=True )
+            return  '',408
+
+        status_code= result.get('ResponseMetadata',{}).get('HTTPStatusCode',0)
+        if status_code == 200:
+            if options.debug_echo:
+                self.dump_response( result )
+            if 'usage' in result:
+                usage= result['usage']
+                if self.manager:
+                    self.manager.stat_add( usage.get('outputTokens',0), usage.get('inputTokens',0), request_time )
+            message= result.get('output',{}).get('message')
+            return  message,status_code
+        else:
+            print( 'Error: %d' % status_code, flush=True )
+        return  None,status_code
+
+    def chat2( self, session ):
+        options= session.get_options()
+        toolbox= session.get_toolbox()
+        self.initialize()
+        session.fix_messages( True, 'reasoning' )
+
+        response= ''
+        content= ''
+
+        status_code= 408
+        while True:
+            message,status_code= self.chat2_1( session )
+            if status_code != 200:
+                return  response,status_code
+
+            role= message['role']
+            if role != 'assistant':
+                return  f'Unknown role "{role}" error',400
+
+            message= self.bedrock_to_openai( message )
+
+            content= message.get('content')
+            tool_calls= message.get('tool_calls')
+            reasoning= message.get('reasoning')
+            session.push_assistant( content, tool_calls, reasoning, 'reasoning' )
+
+            if content and content.strip() != '':
+                response+= content + '\n'
+
+            if tool_calls:
+                toolresult= False
+                for tool_call in tool_calls:
+                    tool_call_id= tool_call['id']
+                    function= tool_call['function']
+                    func_name= function['name']
+                    arguments= function['arguments']
+                    data= ''
+                    if toolbox:
+                        print( '**TOOLCALL**:', func_name, arguments, flush=True )
+                        data= toolbox.call_func( func_name, arguments, session.get_tool_env() )
+                    session.push_result( data, func_name, tool_call_id )
+                    toolresult= True
+                    if options.response_all:
+                        response+= '\U0001f527 toolcall: %s\n' % func_name
+                if toolresult:
+                    continue
+            break
+
+        if not options.response_all:
+            response= content
+        return  response,status_code
+
+    #--------------------------------------------------------------------------
+
     def dump_object( self, ch, obj, ignore_set ):
         for key in obj:
             if key not in ignore_set:
@@ -245,7 +484,10 @@ class BedrockAPI:
     def dump_message( self, message ):
         role= message.get( 'role', '<UNKNOWN>' )
         content_list= message.get( 'content', [] )
+        system_list= message.get( 'system', [] )
         print( '----- Role:[%s] -----' % role )
+        for system in system_list:
+            pass
         for content in content_list:
             if 'text' in content:
                 print( '<<<Text>>>' )
@@ -294,20 +536,19 @@ def main():
     def calc_add( a: int, b: int ) -> int:
         """Add two numbers"""
         return  a + b
-    import Functions
     import CommonAPI
-    mcp= Functions.get_toolbox()
-    mcp.tool()( calc_add )
     options= CommonAPI.CommonOptions(
                 model='jp.amazon.nova-2-lite-v1:0',
                 base_url= 'ap-northeast-1',
                 debug_echo= True,
-                print= True,
-                tools= mcp,
-                tool_info_list= mcp.get_tools( ['calc_add'] )
+                print= True
             )
+    session= CommonAPI.Session( None, options )
+    session.get_toolbox().tool()( calc_add )
+    session.set_tools( [ 'calc_add' ] )
+    session.push_user( 'tool使って128348121+12734891+38298342計算して' )
     api= BedrockAPI( options, None )
-    result,_= api.chat( 'tool使って128348121+12734891+38298342計算して', None, None, None, options )
+    result,_= api.chat2( session )
     print( result )
     return  0
 

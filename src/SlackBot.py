@@ -160,18 +160,12 @@ class SlackBot:
                 session.get_info()['mtime']= CommonAPI.ExecTime().get_date()
                 session.get_info()['msg_id']= msg_id
                 session.get_info().update( msg_info )
-                #session.push_user( prompt )
                 try:
                     if True:
-                        #response,status_code,local_options= self.assistant.generate_text( input_obj, None, message_list )
                         input_obj= {
                             'prompt': prompt
                         }
                         response,status_code,session= self.assistant.generate_text2( input_obj, session )
-                        #local_options.tools= ''
-                        #local_options.tool_env= local_options.tool_env.to_dict()
-                        #thread_info['options']= local_options.__dict__
-                        #thread_info['msg_info']= msg_info
                         if status_code != 200:
                             response= '\nserver error: %d\n' % status_code
                     else:

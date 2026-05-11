@@ -3,16 +3,17 @@ chcp 65001
 
 set USE_SLACK=0
 
-set USE_TEXTLOADER=1
-set USE_TEST01=1
-set USE_TEST02=1
-set USE_TEST03=1
-set USE_TEST04=1
-set USE_TEST05=1
-set USE_TEST10=1
-set USE_ASSISTANT1=1
-set USE_CPPREVIEW=1
-set USE_SLACKBOT=1
+set USE_TEXTLOADER=0
+set USE_TEST01=0
+set USE_TEST02=0
+set USE_TEST03=0
+set USE_TEST04=0
+set USE_TEST05=0
+set USE_TEST10=0
+set USE_TEST20=1
+set USE_ASSISTANT1=0
+set USE_CPPREVIEW=0
+set USE_SLACKBOT=0
 
 rem ---------------------------------------------------------------------------
 
@@ -89,6 +90,8 @@ if %USE_TEST05% == 1 python src/Assistant.py %BASE_OPTIONS%  --preset test05
 if %USE_TEST10% == 1 (
 if exist local/flatlib5 python src/Assistant.py %BASE_OPTIONS%  --preset test10 --input input/test10.txt
 )
+
+if %USE_TEST20% == 1 python src/Assistant.py %BASE_OPTIONS%  --preset test20
 
 if %USE_ASSISTANT1% == 1 python src/Assistant.py %BASE_OPTIONS%  --preset assistant1
 

@@ -106,6 +106,34 @@ F frequency_penalty 1.0
 
 
 ;;-----------------------------------------------------------------------------
+;; Fallback
+======== test20
+
+S base_url http://localhost:30000
+S provider openai
+I timeout  3
+S preset_fallback   test20-fallback
+
+====T base_prompt
+
+テンション高く自己紹介して
+
+
+======== test20-fallback
+
+S base_url http://localhost:30000
+S provider openai
+I timeout  3
+S preset_fallback   test20-fallback2
+
+
+======== test20-fallback2
+
+I num_ctx   16384
+F temperature 1.0
+
+
+;;-----------------------------------------------------------------------------
 ;; 複雑なツール呼び出し SourceBrowser2
 ======== assistant1
 
@@ -114,7 +142,7 @@ A tools	    read_source_code search_in_files
 A env       MCP_FOLDER_ROOT=input MCP_SOURCE_ROOT=input
 F temperature 0.6
 F min_p	    0.0
-F top_p	    0.95
+;;F top_p	    0.95
 I top_k	    20
 F presence_penalty  0.0
 F frequency_penalty 1.0
@@ -143,7 +171,7 @@ A tools	    list_files search_text read_file_range create_issue
 A env       MCP_FOLDER_ROOT=input MCP_SOURCE_ROOT=input
 F temperature 0.6
 F min_p	    0.0
-F top_p	    0.95
+;;F top_p	    0.95
 I top_k	    20
 F presence_penalty  0.0
 F frequency_penalty 1.0
@@ -179,7 +207,7 @@ A tools     list_files search_text read_file_range  list_slack_channels get_chan
 A env       MCP_FOLDER_ROOT=local MCP_SOURCE_ROOT=local
 F temperature 0.6
 F min_p	    0.0
-F top_p	    0.95
+;;F top_p	    0.95
 I top_k	    20
 F presence_penalty  0.0
 F frequency_penalty 1.0

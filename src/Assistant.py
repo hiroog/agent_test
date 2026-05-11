@@ -99,20 +99,17 @@ class AssistantOptions(CommonAPI.CommonOptions):
         self.channel= None
         self.config_file= 'config.txt'
         self.preset= 'default'
+        self.preset_fallback= None
         self.nossl= False
         self.prompt_dir= '.'
         self.env= []
         self.base_prompt= None
         self.system_prompt= None
         self.header= ''
-        self.tool_env= Functions.ToolEnv()
-        self.tool_env= None
         self.apply_params( args )
 
     def copy_from( self, src ):
         super().copy_from( src )
-        if src.tool_env:
-            self.tool_env= Functions.ToolEnv( src.tool_env.to_dict() )
         return  self
 
     def set_env( self, env_list ):
@@ -125,19 +122,18 @@ class AssistantOptions(CommonAPI.CommonOptions):
 class Assistant:
 
     MERGE_KEY_LIST= [
-            'base_url', 'provider', 'model', 'verify'
+            'base_url', 'provider', 'model', 'verify', 'timeout',
             'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'presence_penalty', 'frequency_penalty', 'max_tokens',
-            'env', 'base_prompt', 'system_prompt', 'header',
+            'env', 'tools',
+            'base_prompt', 'system_prompt', 'header',
             'reasoning', 'streaming',
+            'preset_fallback',
             ]
 
     def __init__( self, options ):
         self.config= self.load_file( options.config_file )
-        options.tools= Functions.get_toolbox()
-        options.tools.debug_echo= options.debug_echo
         self.options= options
         self.options.merge_params( self.config, self.MERGE_KEY_LIST )
-        #options.set_env( self.options.env )
         self.common_api= CommonAPI.CommonAPI( options )
         self.import_inline_modules()
 
@@ -150,7 +146,7 @@ class Assistant:
     #--------------------------------------------------------------------------
     def load_json( self, file_name ):
         if os.path.exists( file_name ):
-            with open( file_name, 'r', encoding='utf-8' ) as fi:
+            with open( file_name, 'r', encoding='utf-8', errors='ignore' ) as fi:
                 return  json.loads( fi.read() )
         return  None
 
@@ -178,14 +174,16 @@ class Assistant:
             if preset_name in self.config:
                 preset= self.config[preset_name]
                 local_options.merge_params( preset, self.MERGE_KEY_LIST )
-                if local_options.tools:
-                    local_options.tool_info_list= local_options.tools.get_tools( preset.get('tools') )
+                #if local_options.tools:
+                #    local_options.tool_info_list= local_options.tools.get_tools( preset.get('tools') )
                 if load_prompt:
                     if 'include_system' in preset:
                         local_options.system_prompt= self.load_prompt( preset['include_system'], local_options.system_prompt )
                     if 'include_prompt' in preset:
                         local_options.base_prompt= self.load_prompt( preset['include_prompt'], local_options.base_prompt )
-        return  local_options
+                return  local_options
+            print( 'Fatal error: Preset "%s" not found' % preset_name )
+        return  None
 
     #--------------------------------------------------------------------------
 
@@ -244,10 +242,36 @@ class Assistant:
 
     #--------------------------------------------------------------------------
 
+    def fallback( self, prompt, input_obj, session, preset_name ):
+        options= self.load_preset2( preset_name, False )
+        session.set_options( options )
+        if 'model' in input_obj:
+            options.model= input_obj['model']
+
+        options.prompt= prompt
+        session.set_env( self.options.env )
+        session.set_env( options.env )
+        if 'env' in input_obj:
+            session.set_env( input_obj['env'] )
+
+        header_text= input_obj.get( 'header', options.header )
+
+        session.set_tools( options.tools )
+
+        response,status_code= self.common_api.generate2( session )
+
+        if status_code != 200:
+            print( 'Generate Error: %d' % status_code, flush=True )
+            return  response,status_code,session,options
+
+        if len(response) >= 1 and response[-1] != '\n':
+            response+= '\n'
+        response= header_text + response
+        return  response,status_code,session,options
+
     def generate_text2( self, input_obj, session= None ):
         if session is None:
             session= CommonAPI.Session()
-            session.tool_env= Functions.ToolEnv()
 
         prompt= input_obj.get( 'prompt', '' )
 
@@ -277,8 +301,15 @@ class Assistant:
             session.set_env( input_obj['env'] )
         header_text= input_obj.get( 'header', options.header )
 
+        session.set_tools( options.tools )
+
         response,status_code= self.common_api.generate2( session )
         if status_code != 200:
+            while status_code == 408 and options.preset_fallback:
+                print( '###### Fallback %s ######' % options.preset_fallback )
+                response,status_code,session,options= self.fallback( prompt, input_obj, session, options.preset_fallback )
+                if status_code == 200:
+                    return  response,status_code,session
             print( 'Generate Error: %d' % status_code, flush=True )
             return  response,status_code,session
         if len(response) >= 1 and response[-1] != '\n':

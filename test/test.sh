@@ -9,6 +9,7 @@ USE_TEST03=1
 USE_TEST04=1
 USE_TEST05=1
 USE_TEST10=1
+USE_TEST20=1
 USE_ASSISTANT1=1
 USE_CPPREVIEW=1
 USE_SLACKBOT=1
@@ -123,6 +124,11 @@ if [ $USE_TEST10 = 1 ];then
   if [ -e local/flatlib5 ];then
 python3 src/Assistant.py $BASE_OPTIONS --preset test10 --input input/test10.txt
   fi
+fi
+
+# fallback
+if [ $USE_TEST20 = 1 ];then
+python3 src/Assistant.py $BASE_OPTIONS --preset test20
 fi
 
 #------------------------------------------------------------------------------
