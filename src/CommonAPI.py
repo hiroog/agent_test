@@ -10,7 +10,6 @@ import datetime
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
-#from Functions import ToolEnv,get_toolbox
 import Functions
 
 #------------------------------------------------------------------------------
@@ -143,6 +142,9 @@ class Session:
 
     def is_root( self ):
         return  self.message_list == []
+
+    def get_id( self ):
+        return  self.session_id
 
     def get_info( self ):
         return  self.msg_info
@@ -318,6 +320,8 @@ class CommonAPI:
         self.options= options
         self.api_map= {}
         self.stat_reset()
+        if self.options.debug_echo:
+            Functions.get_toolbox().debug_echo= True
 
     #--------------------------------------------------------------------------
 

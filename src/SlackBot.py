@@ -63,35 +63,48 @@ from SlackAPI import save_json, load_json
 
 class ThreadCache:
     THREAD_CACHE_DIR= 'threads'
+    THREAD_QUEUE_SIZE= 20
 
     def __init__( self ):
         self.lock= threading.Lock()
-        self.thread_map= {}
+        self.session_map= {}
+        self.thread_queue= []
         if not os.path.exists( self.THREAD_CACHE_DIR ):
             os.mkdir( self.THREAD_CACHE_DIR )
+
+    def pop_queue_0( self, thread_id ):
+        if thread_id in self.thread_queue:
+            self.thread_queue.remove( thread_id )
+        self.thread_queue.append( thread_id )
+        while len(self.thread_queue) > self.THREAD_QUEUE_SIZE:
+            pop_name= self.thread_queue.pop(0)
+            if pop_name in self.session_map:
+                self.session_map[pop_name]= None
+                del self.session_map[pop_name]
+                print( 'Cache <<< %d >>> Removed %s' % (len(self.thread_queue),pop_name) )
 
     def get_thread_file_name( self, thread_id ):
         params= thread_id.split( '_' )
         return  os.path.join( self.THREAD_CACHE_DIR, params[0]+'_'+params[1], thread_id + '.json' )
 
-    def save_thread_0( self, thread_id ):
-        if thread_id in self.thread_map:
-            save_file_name= self.get_thread_file_name( thread_id )
-            p,_= os.path.split( save_file_name )
-            if not os.path.exists( p ):
-                os.makedirs( p )
-            session= self.thread_map[thread_id]
-            session.save_session( save_file_name )
+    def save_thread_0( self, session ):
+        thread_id= session.get_id()
+        save_file_name= self.get_thread_file_name( thread_id )
+        p,_= os.path.split( save_file_name )
+        if not os.path.exists( p ):
+            os.makedirs( p )
+        session.save_session( save_file_name )
 
     def has_thread_0( self, thread_id ):
-        if thread_id in self.thread_map:
-            return  True
+        if thread_id in self.session_map:
+            if self.session_map[thread_id]:
+                return  True
         thread_file= self.get_thread_file_name( thread_id )
         if os.path.exists( thread_file ):
             session= CommonAPI.Session( thread_id )
             session.load_session( thread_file )
             session.lock= threading.Lock()
-            self.thread_map[thread_id]= session
+            self.session_map[thread_id]= session
             return  True
         return  False
 
@@ -102,7 +115,7 @@ class ThreadCache:
     def has_message( self, thread_id, msg_id ):
         with self.lock:
             if self.has_thread_0( thread_id ):
-                session= self.thread_map[thread_id]
+                session= self.session_map[thread_id]
                 if session.get_info().get('msg_id','') == msg_id:
                     return  True
             return  False
@@ -113,9 +126,9 @@ class ThreadCache:
                 session= CommonAPI.Session( thread_id )
                 session.get_info()['date']= CommonAPI.ExecTime().get_date()
                 session.lock= threading.Lock()
-                self.thread_map[thread_id]= session
-                #{ 'thread_id': thread_id, 'message_list': [], 'date': ExecTime().get_date(), 'mtime': '', 'msg_id': '' }
-            return  self.thread_map[thread_id]
+                self.session_map[thread_id]= session
+            self.pop_queue_0( thread_id )
+            return  self.session_map[thread_id]
 
 
 #------------------------------------------------------------------------------
@@ -171,7 +184,7 @@ class SlackBot:
                     else:
                         response= '返答だよ'
                 finally:
-                    self.thread_cache.save_thread_0( thread_id )
+                    self.thread_cache.save_thread_0( session )
         return  response
 
     #--------------------------------------------------------------------------
