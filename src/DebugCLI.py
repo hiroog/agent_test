@@ -38,7 +38,7 @@ class SlackCLI:
         if prompt.strip() != '':
             prompt= 'USER: ' + prompt
             result= self.bot.bot( thread_id, prompt, '', {} )
-            print( '\U0001f916 ****************' )
+            print( '\n\U0001f916 ****************' )
             print( result )
             print( '*******************', flush=True )
 
@@ -46,8 +46,7 @@ class SlackCLI:
     def cli_thread( self ):
         thread_id= self.get_thread_id()
         while True:
-            print( 'Robo> ', end='' )
-            line= input()
+            line= input( 'User> ' )
             self.bot_single( thread_id, line )
 
     def cli_command( self, prompt_text ):

@@ -215,7 +215,8 @@ class Session:
     #--------------------------------------------------------------------------
 
     def fix_messages( self, to_dict, reasoning_tag ):
-        print( '$$$$$$$$$$$$$ FIX ARGS $$$$$$$$$$$$$' )
+        if self.options.debug_echo:
+            print( '$$$$$$$$$$$$$ FIX ARGS $$$$$$$$$$$$$' )
         prev_message= None
         prev_role= None
         for message in self.message_list:
@@ -226,31 +227,36 @@ class Session:
                     for tool_call in tool_calls:
                         if 'type' not in tool_call:
                             tool_call['type']= 'function'
-                            print( '  $$ INSERT FUNCTION-TYPE $$' )
+                            if self.options.debug_echo:
+                                print( '  $$ INSERT FUNCTION-TYPE $$' )
                         func= tool_call['function']
                         arg= func['arguments']
                         if to_dict:
                             if type(arg) is str:
                                 func['arguments']= json.loads( arg )
-                                print( '  $$ CONVERT ARG to Dict $$' )
+                                if self.options.debug_echo:
+                                    print( '  $$ CONVERT ARG to Dict $$' )
                         else:
                             if type(arg) is dict:
                                 func['arguments']= json.dumps( arg )
-                                print( '  $$ CONVERT ARG to Json $$' )
+                                if self.options.debug_echo:
+                                    print( '  $$ CONVERT ARG to Json $$' )
                 if 'content' not in message:
                     message['content']= '\n\n'
                 for tag in self.REASONING_TAGS:
                     if tag in message:
                         if tag != reasoning_tag:
-                            print( '  $$ CONVERT TAG %s to %s $$' % (tag, reasoning_tag) )
                             message[reasoning_tag]= message[tag]
                             del message[tag]
+                            if self.options.debug_echo:
+                                print( '  $$ CONVERT TAG %s to %s $$' % (tag, reasoning_tag) )
             elif role == 'user':
                 if prev_role == 'user':
-                    print( '  $$ MERGE USER MESSAGE $$' )
                     prev_message['content']+= '\n' + message['content']
                     message['content']= ''
                     message['role']= None
+                    if self.options.debug_echo:
+                        print( '  $$ MERGE USER MESSAGE $$' )
                     continue
             prev_role= role
             prev_message= message
@@ -259,7 +265,8 @@ class Session:
             if message['role'] is not None:
                 fixed_message_list.append( message )
             else:
-                print( '  $$ DELETE MESSAGE $$' )
+                if self.options.debug_echo:
+                    print( '  $$ DELETE MESSAGE $$' )
         self.message_list= fixed_message_list
 
     #--------------------------------------------------------------------------
