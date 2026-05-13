@@ -74,8 +74,15 @@ class OptionBase:
             if key in params:
                 setattr( self, key, params[key] )
 
+    def merge_params_all( self, src_dict ):
+        for key in src_dict:
+            if type(src_dict[key]) is not dict:
+                #print( key, type(src_dict[key]) )
+                setattr( self, key, src_dict[key] )
+
     def copy_from( self, src ):
-        self.merge_params( src.__dict__, src.__dict__.keys() )
+        #self.merge_params( src.__dict__, src.__dict__.keys() )
+        self.merge_params_all( src.__dict__ )
         return  self
 
 #------------------------------------------------------------------------------

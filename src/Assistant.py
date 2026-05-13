@@ -18,13 +18,13 @@ import TextLoader
 
 # config.json
 # {
-#    "base_url": "http://localhost:11434",
+#    "base_url": "http://localhost:8080/v1",
 #    "preset-name1": {
-#       "model": "model-name",          option
-#       "system_prompt": "prompt",      option
-#       "base_prompt": "prompt",        option
-#       "num_ctx": 4096,                option
-#       "temperature": 0.7,             option
+#       "model": "model-name",           option
+#       "system_prompt": "prompt",       option
+#       "base_prompt": "prompt",         option
+#       "num_ctx": 4096,                 option
+#       "temperature": 0.7,              option
 #       "tools": [
 #          "calculator",
 #       ]
@@ -32,37 +32,37 @@ import TextLoader
 # }
 
 # config.txt
-# S base_url    http://localhost:11434
-# S provider    provider                option
-# S model       model-name              option
-# I num_ctx     4096                    option
-# F temperature 0.7                     option
-# I top_k       20                      option
-# F top_p       1.0                     option
-# F min_p       0.0                     option
-# F presence_penalty  0.0               option
-# F frequency_penalty 1.0               option
-# A env envname=envvalue ～             option
-# A inline_mcp  FileTools Memory        option
+# S base_url    http://localhost:8080/v1
+# S provider    provider                 option
+# S model       model-name               option
+# I num_ctx     4096                     option
+# F temperature 0.7                      option
+# I top_k       20                       option
+# F top_p       1.0                      option
+# F min_p       0.0                      option
+# F presence_penalty  0.0                option
+# F frequency_penalty 1.0                option
+# A env envname=envvalue ～              option
+# A inline_mcp  FileTools Memory         option
 # ======== preset-name1
-# S base_url    http://localhost:11434  option
-# S provider    provider                option
-# S model       model-name              option
-# I num_ctx     4096                    option
-# F temperature 0.7                     option
-# I top_k       20                      option
-# F top_p       1.0                     option
-# F min_p       0.0                     option
-# A env envname=envvalue ～             option
-# A tools       calculator              option
-# ====T system_prompt                   option
+# S base_url    http://localhost:8080/v1 option
+# S provider    provider                 option
+# S model       model-name               option
+# I num_ctx     4096                     option
+# F temperature 0.7                      option
+# I top_k       20                       option
+# F top_p       1.0                      option
+# F min_p       0.0                      option
+# A env envname=envvalue ～              option
+# A tools       calculator               option
+# ====T system_prompt                    option
 # prompt
-# ====T base_prompt                     option
+# ====T base_prompt                      option
 # prompt
 # ======== preset-name2
 # A chain       preset-name1 preset-name2 ..
 # ======== preset-name3
-# S include_prompt prompt.md            option
+# S include_prompt prompt.md             option
 
 # input_file.json
 # {
@@ -121,19 +121,20 @@ class AssistantOptions(CommonAPI.CommonOptions):
 
 class Assistant:
 
-    MERGE_KEY_LIST= [
-            'base_url', 'provider', 'model', 'verify', 'timeout',
-            'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'presence_penalty', 'frequency_penalty', 'max_tokens',
-            'env', 'tools',
-            'base_prompt', 'system_prompt', 'header',
-            'reasoning', 'streaming',
-            'preset_fallback',
-            ]
+    #MERGE_KEY_LIST= [
+    #        'base_url', 'provider', 'model', 'verify', 'timeout',
+    #        'num_ctx', 'temperature', 'top_k', 'top_p', 'min_p', 'presence_penalty', 'frequency_penalty', 'max_tokens',
+    #        'env', 'tools',
+    #        'base_prompt', 'system_prompt', 'header',
+    #        'reasoning', 'streaming',
+    #        'preset_fallback',
+    #        ]
 
     def __init__( self, options ):
         self.config= self.load_file( options.config_file )
         self.options= options
-        self.options.merge_params( self.config, self.MERGE_KEY_LIST )
+        #self.options.merge_params( self.config, self.MERGE_KEY_LIST )
+        self.options.merge_params_all( self.config )
         self.common_api= CommonAPI.CommonAPI( options )
         self.import_inline_modules()
 
@@ -173,7 +174,8 @@ class Assistant:
         if self.config:
             if preset_name in self.config:
                 preset= self.config[preset_name]
-                local_options.merge_params( preset, self.MERGE_KEY_LIST )
+                #local_options.merge_params( preset, self.MERGE_KEY_LIST )
+                local_options.merge_params_all( preset )
                 #if local_options.tools:
                 #    local_options.tool_info_list= local_options.tools.get_tools( preset.get('tools') )
                 if load_prompt:

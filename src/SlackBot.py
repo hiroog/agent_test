@@ -29,6 +29,11 @@ from SlackAPI import save_json, load_json
 #          2. [Generate]
 #        Token                   => SLACK_APP_TOKEN
 #
+#  App Home
+#
+#      Message Tab => ON
+#          Allow users to send Slash commands and messages from the messages tab => ON  (DM)
+#
 #  OAuth & Permissions
 #
 #      BotTokenScope
@@ -45,6 +50,10 @@ from SlackAPI import save_json, load_json
 #          reactions:write
 #          users:read
 #
+#          im:history (DM)
+#          im:read (DM)
+#          im:write (DM)
+#
 #  Event Subscriptions
 #
 #      Enable Events => ON
@@ -54,6 +63,7 @@ from SlackAPI import save_json, load_json
 #          app_mention
 #          message.channels
 #          message.groups
+#          message.im  (DM)
 #
 #  Install App
 #      [Install to Workspace]
@@ -138,20 +148,13 @@ class SlackBotOptions(Assistant.AssistantOptions):
         super().__init__()
         self.preset= 'chatbot'
         self.response_all= True
+        self.dm_enabled= False
+        self.channel_allow_list= []         # channel-id or user-id
+        self.channel_post_allow_list= []
         self.apply_params( args )
 
 
 #------------------------------------------------------------------------------
-
-# thread_info
-# {
-#     "thread_id": "slack_thread_ts",
-#     "date": "DATE",
-#     "mtime": "MTIME",
-#     "msg_id": "GUID",
-#     "message_list": [],
-#     "queue": []
-# }
 
 class SlackBot:
     def __init__( self, options ):
@@ -211,16 +214,42 @@ class SlackBot:
         return  self.get_thread_id_0( self.get_thread_ts( message ) )
 
     def send_message( self, say, thread_id, message, client ):
-        msg_id= message.get( 'client_msg_id', '' )
+        # bot のメッセージは無視
+        if message.get('bot_id'):
+            print( 'BOT' )
+            return
+
+        channel= message.get( 'channel', '' )
+        user= message.get( 'user', '' )
+
+        # DM の場合
+        if message.get('channel_type') == 'im':
+            if not self.options.dm_enabled:
+                print( 'DM not allowed' )
+                return
+
+            # 許可ユーザーじゃなければ無視
+            if user not in self.options.channel_allow_list:
+                print( 'Deny <<<< USER %s' % user )
+                return
+            print( 'Allow >>>> USEER %s' % user )
+
+        else:
+            # 許可チャンネルじゃなければ無視
+            if channel not in self.options.channel_allow_list:
+                print( 'Deny <<<< CHANNEL %s' % channel )
+                return
+            print( 'Allow >>>> CHANNEL %s' % channel )
+
 
         # すでに返答済み
+        msg_id= message.get( 'client_msg_id', '' )
         if self.thread_cache.has_message( thread_id, msg_id ):
             return
 
         thread_ts= self.get_thread_ts( message )
 
         # Reaction Mark
-        channel= message.get( 'channel', '' )
         ts= message.get( 'ts', '' )
         try:
             reaction_mark= 'robot_face'
@@ -229,7 +258,6 @@ class SlackBot:
             print( f'Error reaction:{e}\n' )
 
         text= message.get( 'text', '' )
-        user= message.get( 'user', '' )
         tsstr= time.strftime( '%Y-%m-%d %H:%M:%S', self.ts_to_local_time( ts ) )
         prompt= f'{tsstr} {user}: {text}'
 
@@ -245,6 +273,7 @@ class SlackBot:
                     'text': reply_text
                 }
             ])
+        logger.info(f'replied to {ts} in channel {channel}')
 
     def event_app_mention( self, body, logger, say, client ):
         if self.options.debug_echo:
@@ -253,15 +282,14 @@ class SlackBot:
             print( '######(mention)' )
 
         message= body['event']
-        thread_id= self.get_thread_id( message )
 
         # すでに参加済みなら無視
+        thread_id= self.get_thread_id( message )
         if self.thread_cache.has_thread( thread_id ):
             return
 
         # 途中から参加
         self.send_message( say, thread_id, message, client )
-        logger.info(f'mention replied to {message["ts"]} in channel {message["channel"]}')
 
     def event_message( self, message, say, logger, client ):
         if self.options.debug_echo:
@@ -269,21 +297,17 @@ class SlackBot:
             print( message )
             print( '$$$$$$<message>' )
 
-        # DM は無視, Channel のみ
-        if message.get('channel_type') == 'im':
-            return
-
         # bot のメッセージは無視
         if message.get('bot_id'):
             return
 
-        # 会話に参加していないスレッドは無視
+        # Channel の場合会話に参加していないスレッドは無視
         thread_id= self.get_thread_id( message )
-        if not self.thread_cache.has_thread( thread_id ):
-            return
+        if message.get('channel_type') != 'im':
+            if not self.thread_cache.has_thread( thread_id ):
+                return
 
         self.send_message( say, thread_id, message, client )
-        logger.info(f'replied to {message["ts"]} in channel {message["channel"]}')
 
 
 #------------------------------------------------------------------------------
@@ -325,6 +349,7 @@ def usage():
     print( '  --provider <provider>' )
     print( '  --host <base_url>' )
     print( '  --model <model>' )
+    print( '  --dm' )
     print( '  --print' )
     print( '  --debug' )
     sys.exit( 1 )
@@ -349,6 +374,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'base_url' )
             elif arg == '--model':
                 ai= options.set_str( ai, argv, 'model' )
+            elif arg == '--dm':
+                options.dm_enabled= True
             elif arg == '--noverify':
                 options.verify= False
             elif arg == '--print':
