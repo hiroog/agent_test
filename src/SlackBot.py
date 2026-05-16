@@ -7,6 +7,7 @@ import threading
 import time
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+from slack_bolt.middleware.assistant import Assistant as SlackAssistant
 
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
@@ -39,20 +40,29 @@ from SlackAPI import save_json, load_json
 #      BotTokenScope
 #
 #          app_mention:read
+#          assistant:write
 #          channels:history
 #          channels:read
 #          chat:write
 #          chat:write.customize
+#          emoji:read
+#          files:read
+#          files:write
 #          groups:history
 #          groups:read
 #          groups:write
-#          reactions:read
-#          reactions:write
-#          users:read
-#
 #          im:history (DM)
 #          im:read (DM)
 #          im:write (DM)
+#          mpim:history (?)
+#          mpim:read (?)
+#          mpim:write (?)
+#          pins:read (?)
+#          pins:write (?)
+#          reactions:read
+#          reactions:write
+#          usergroups:read
+#          users:read
 #
 #  Event Subscriptions
 #
@@ -143,12 +153,20 @@ class ThreadCache:
 
 #------------------------------------------------------------------------------
 
-class SlackBotOptions(Assistant.AssistantOptions):
+class TaskManager:
+    def __init__( self ):
+        pass
+
+
+#------------------------------------------------------------------------------
+
+class ChatBotOptions(Assistant.AssistantOptions):
     def __init__( self, **args ):
         super().__init__()
         self.preset= 'chatbot'
         self.response_all= True
         self.dm_enabled= False
+        self.assistant_mode= False
         self.channel_allow_list= []         # channel-id or user-id
         self.channel_post_allow_list= []
         self.apply_params( args )
@@ -156,7 +174,7 @@ class SlackBotOptions(Assistant.AssistantOptions):
 
 #------------------------------------------------------------------------------
 
-class SlackBot:
+class ChatBot:
     def __init__( self, options ):
         self.options= options
         self.thread_cache= ThreadCache()
@@ -165,13 +183,13 @@ class SlackBot:
     #--------------------------------------------------------------------------
     # Assistant API
 
-        # thread_id = スレッド(セッション)を識別できる固有文字列 (必須)
+        # session_id = セッション(スレッド)を識別できる固有文字列 (必須)
         # prompt = ユーザー入力 (必須)
         # msg_id = 同一メッセージかどうか判定する場合のみ必要。不要なら ''
         # msg_info = スレッド(セッション)ログに記録したい情報。不要なら {}
-    def bot( self, thread_id, prompt, msg_id, msg_info ):
+    def bot( self, session_id, prompt, msg_id, msg_info ):
         with CommonAPI.ExecTime( 'Generate' ):
-            session= self.thread_cache.get_session( thread_id )
+            session= self.thread_cache.get_session( session_id )
             with session.get_lock():
                 session.get_info()['mtime']= CommonAPI.ExecTime().get_date()
                 session.get_info()['msg_id']= msg_id
@@ -190,8 +208,127 @@ class SlackBot:
                     self.thread_cache.save_thread_0( session )
         return  response
 
+    def has_message( self, session_id, msg_id ):
+        return  self.thread_cache.has_message( session_id, msg_id )
+
+    def has_session( self, session_id ):
+        return  self.thread_cache.has_thread( session_id )
+
+
+#------------------------------------------------------------------------------
+
+slack_app= None
+
+#------------------------------------------------------------------------------
+
+def respond_within_3_seconds( ack ):
+    ack()
+
+def handle_app_mention_events( body, say, client ):
+    global slack_app
+    slack_app.event_app_mention( body, say, client )
+
+def handle_message( message, say, client ):
+    global slack_app
+    slack_app.event_message( message, say, client )
+
+def handle_message_events( body ):
+    message_type= body.get( 'type', '' )    # event_callback
+    event= body.get( 'event', {} )
+    event_type= event.get( 'type', '' )     # message
+    subtype= event.get( 'subtype', '' )     # message_deleted/message_changed/bot_message
+    channel= event.get( 'channel', '' )     # C0
+    ts= event.get( 'ts', '' )
+    text= f'receved {message_type} {event_type} {subtype} {channel} {ts}'
+    print( text )
+
+#------------------------------------------------------------------------------
+
+def assistant_respond_within_3_seconds( event, set_status ):
+    global slack_app
+    if not slack_app.is_allowed( event ):
+        return
+    set_status( status='むむむむ' )
+
+def assistant_handle_app_mention_events( body, say, client ):
+    global slack_app
+    slack_app.event_app_mention( body, say, client )
+
+def assistant_handle_message( message, say, client ):
+    global slack_app
+    slack_app.event_message( message, say, client )
+
+def start_assistant_thread( say, set_suggested_prompts ):
+    say( 'Hey' )
+
+def respond_in_assistant_thread( payload, say, client, set_status ):
+    set_status( status='むむむむ' )
+    global slack_app
+    slack_app.event_message( payload, say, client )
+
+
+#------------------------------------------------------------------------------
+
+class SlackBotApp:
+    def __init__( self, options ):
+        self.options= options
+        self.chatbot= ChatBot( options )
+        global slack_app
+        slack_app= self
+
+    #--------------------------------------------------------------------------
+    # Application
+
+    def get_bottoken( self ):
+        return  os.environ.get('SLACK_BOT_TOKEN', os.environ.get('SLACK_API_TOKEN'))
+
+    def app_start( self, app ):
+        handler= SocketModeHandler( app, os.environ['SLACK_APP_TOKEN'] )
+        handler.start()
+
+    def run_app( self ):
+        app= App( token= self.get_bottoken() )
+        if not self.options.assistant_mode:
+            app.event('app_mention')( ack=respond_within_3_seconds, lazy=[handle_app_mention_events] )
+            app.message()(ack=respond_within_3_seconds, lazy=[handle_message])
+            app.event('message')(ack=respond_within_3_seconds, lazy=[handle_message_events])
+        else:
+            app.event('app_mention')( ack=assistant_respond_within_3_seconds, lazy=[assistant_handle_app_mention_events] )
+            app.message()(ack=assistant_respond_within_3_seconds, lazy=[assistant_handle_message])
+            app.event('message')(ack=respond_within_3_seconds, lazy=[handle_message_events])
+            assistant= SlackAssistant()
+            assistant.thread_started( start_assistant_thread )
+            assistant.user_message( respond_in_assistant_thread )
+            app.use( assistant )
+        self.app_start( app )
+
     #--------------------------------------------------------------------------
     # Slack API
+
+    def is_allowed( self, event ):
+        channel= event.get( 'channel', '' )
+        user= event.get( 'user', '' )
+        # DM の場合
+        if event.get('channel_type') == 'im':
+            if not self.options.dm_enabled:
+                print( 'DM not allowed' )
+                return  False
+            # 許可ユーザーじゃなければ無視
+            if user not in self.options.channel_allow_list:
+                print( 'Deny <<<< USER %s' % user )
+                return  False
+            print( 'Allow >>>> USEER %s' % user )
+        else:
+            # 許可チャンネルじゃなければ無視
+            if channel not in self.options.channel_allow_list:
+                print( 'Deny <<<< CHANNEL %s' % channel )
+                return  False
+            print( 'Allow >>>> CHANNEL %s' % channel )
+        return  True
+
+
+    #--------------------------------------------------------------------------
+    # Session ID
 
     def ts_to_local_time( self, ts ):
         try:
@@ -213,38 +350,24 @@ class SlackBot:
     def get_thread_id( self, message ):
         return  self.get_thread_id_0( self.get_thread_ts( message ) )
 
+    #--------------------------------------------------------------------------
+    # Message
+
     def send_message( self, say, thread_id, message, client ):
         # bot のメッセージは無視
         if message.get('bot_id'):
             print( 'BOT' )
             return
 
+        if not self.is_allowed( message ):
+            return
+
         channel= message.get( 'channel', '' )
         user= message.get( 'user', '' )
 
-        # DM の場合
-        if message.get('channel_type') == 'im':
-            if not self.options.dm_enabled:
-                print( 'DM not allowed' )
-                return
-
-            # 許可ユーザーじゃなければ無視
-            if user not in self.options.channel_allow_list:
-                print( 'Deny <<<< USER %s' % user )
-                return
-            print( 'Allow >>>> USEER %s' % user )
-
-        else:
-            # 許可チャンネルじゃなければ無視
-            if channel not in self.options.channel_allow_list:
-                print( 'Deny <<<< CHANNEL %s' % channel )
-                return
-            print( 'Allow >>>> CHANNEL %s' % channel )
-
-
         # すでに返答済み
         msg_id= message.get( 'client_msg_id', '' )
-        if self.thread_cache.has_message( thread_id, msg_id ):
+        if self.chatbot.has_message( thread_id, msg_id ):
             return
 
         thread_ts= self.get_thread_ts( message )
@@ -266,16 +389,18 @@ class SlackBot:
             'thread_ts': thread_ts,
         }
 
-        reply_text= self.bot( thread_id, prompt, msg_id, msg_info )
+        reply_text= self.chatbot.bot( thread_id, prompt, msg_id, msg_info )
         say( text=reply_text, thread_ts=thread_ts, blocks= [
                 {
                     'type': 'markdown',
                     'text': reply_text
                 }
             ])
-        logger.info(f'replied to {ts} in channel {channel}')
 
-    def event_app_mention( self, body, logger, say, client ):
+    #--------------------------------------------------------------------------
+    # Event
+
+    def event_app_mention( self, body, say, client ):
         if self.options.debug_echo:
             print( '######(mention)' )
             print( body )
@@ -285,13 +410,13 @@ class SlackBot:
 
         # すでに参加済みなら無視
         thread_id= self.get_thread_id( message )
-        if self.thread_cache.has_thread( thread_id ):
+        if self.chatbot.has_session( thread_id ):
             return
 
         # 途中から参加
         self.send_message( say, thread_id, message, client )
 
-    def event_message( self, message, say, logger, client ):
+    def event_message( self, message, say, client ):
         if self.options.debug_echo:
             print( '$$$$$$<message>' )
             print( message )
@@ -304,37 +429,10 @@ class SlackBot:
         # Channel の場合会話に参加していないスレッドは無視
         thread_id= self.get_thread_id( message )
         if message.get('channel_type') != 'im':
-            if not self.thread_cache.has_thread( thread_id ):
+            if not self.chatbot.has_session( thread_id ):
                 return
 
         self.send_message( say, thread_id, message, client )
-
-
-#------------------------------------------------------------------------------
-
-slack_bot= None
-
-def respound_within_3_seconds( ack ):
-    ack()
-
-def handle_app_mention_events( body, logger, say, client ):
-    global slack_bot
-    slack_bot.event_app_mention( body, logger, say, client )
-
-def handle_message( message, say, logger, client ):
-    global slack_bot
-    slack_bot.event_message( message, say, logger, client )
-
-def handle_message_events( body, logger ):
-    message_type= body.get( 'type', '' )    # event_callback
-    event= body.get( 'event', {} )
-    event_type= event.get( 'type', '' )     # message
-    subtype= event.get( 'subtype', '' )     # message_deleted/message_changed/bot_message
-    channel= event.get( 'channel', '' )     # C0
-    ts= event.get( 'ts', '' )
-    text= f'receved {message_type} {event_type} {subtype} {channel} {ts}'
-    print( text )
-    logger.info( text )
 
 
 #------------------------------------------------------------------------------
@@ -350,6 +448,7 @@ def usage():
     print( '  --host <base_url>' )
     print( '  --model <model>' )
     print( '  --dm' )
+    print( '  --assistant' )
     print( '  --print' )
     print( '  --debug' )
     sys.exit( 1 )
@@ -357,7 +456,7 @@ def usage():
 
 def main( argv ):
     acount= len(argv)
-    options= SlackBotOptions()
+    options= ChatBotOptions()
     ai= 1
     while ai < acount:
         arg= argv[ai]
@@ -374,6 +473,8 @@ def main( argv ):
                 ai= options.set_str( ai, argv, 'base_url' )
             elif arg == '--model':
                 ai= options.set_str( ai, argv, 'model' )
+            elif arg == '--assistant':
+                options.assistant_mode= True
             elif arg == '--dm':
                 options.dm_enabled= True
             elif arg == '--noverify':
@@ -389,16 +490,8 @@ def main( argv ):
         else:
             usage()
 
-    global slack_bot
-    slack_bot= SlackBot( options )
-
-    app= App( token= os.environ.get('SLACK_BOT_TOKEN', os.environ.get('SLACK_API_TOKEN')) )
-    app.event('app_mention')( ack=respound_within_3_seconds, lazy=[handle_app_mention_events] )
-    app.message()(ack=respound_within_3_seconds, lazy=[handle_message])
-    app.event('message')(ack=respound_within_3_seconds, lazy=[handle_message_events])
-    handler= SocketModeHandler( app, os.environ['SLACK_APP_TOKEN'] )
-    handler.start()
-
+    botapp= SlackBotApp( options )
+    botapp.run_app()
     return  0
 
 if __name__ == '__main__':

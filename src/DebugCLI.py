@@ -17,10 +17,10 @@ import SlackBot
 
 #------------------------------------------------------------------------------
 
-class SlackCLI:
+class ChatCLI:
     def __init__( self, options ):
         self.options= options
-        self.bot= SlackBot.SlackBot( options )
+        self.bot= SlackBot.ChatBot( options )
 
     #--------------------------------------------------------------------------
     # Debug CLI
@@ -74,7 +74,7 @@ def usage():
 
 def main( argv ):
     acount= len(argv)
-    options= SlackBot.SlackBotOptions( prompt_text= None, load_session= None )
+    options= SlackBot.ChatBotOptions( prompt_text= None, load_session= None )
     ai= 1
     while ai < acount:
         arg= argv[ai]
@@ -108,7 +108,7 @@ def main( argv ):
         else:
             usage()
 
-    slack_bot= SlackCLI( options )
+    slack_bot= ChatCLI( options )
     if options.prompt_text:
         slack_bot.cli_command( options.prompt_text )
     else:

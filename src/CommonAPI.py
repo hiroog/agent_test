@@ -222,8 +222,6 @@ class Session:
     #--------------------------------------------------------------------------
 
     def fix_messages( self, to_dict, reasoning_tag ):
-        if self.options.debug_echo:
-            print( '$$$$$$$$$$$$$ FIX ARGS $$$$$$$$$$$$$' )
         prev_message= None
         prev_role= None
         for message in self.message_list:
@@ -411,6 +409,14 @@ class CommonAPI:
 
     #--------------------------------------------------------------------------
 
+    def dump_text( self, context ):
+        length= len(context)
+        if length >= 1024:
+            print( '\n'.join(context.splitlines()[:10]) )
+            print( '... First 10 lines displayed. (%d bytes)' % length )
+        else:
+            print( context )
+
     def dump_object( self, ch, obj, ignore_set ):
         has_key= False
         for key in obj:
@@ -437,7 +443,7 @@ class CommonAPI:
             content= message.get('content','<None>')
             tool_call_id= message.get('tool_call_id','')
             print( '<<ToolCallResult "%s" (id:%s)>>' % (name,tool_call_id) )
-            print( content )
+            self.dump_text( content )
 
     def dump_reasoning( self, message ):
         reasoning_tag= 'reasoning_content'
@@ -450,14 +456,14 @@ class CommonAPI:
             reasoning_text= message.get('thinking')
         if reasoning_text:
             print( '<<<Thinking "%s">>>' % reasoning_tag )
-            print( reasoning_text )
+            self.dump_text( reasoning_text )
 
     def dump_content( self, message ):
         if 'content' in message:
             text= message.get('content', '')
             if text.strip() != '':
                 print( '<<<Content>>>' )
-                print( text )
+                self.dump_text( text )
 
     def dump_message( self, message ):
         role= message.get( 'role', '<UNKNOWN>' )

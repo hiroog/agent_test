@@ -266,3 +266,39 @@ def p4_info() -> str:
     if default_path:
         lines.append( '  default path: %s' % default_path )
     return '\n'.join( lines )
+
+#------------------------------------------------------------------------------
+
+@mcp.tool()
+def p4_exec( arguments_json: str ) -> str:
+    """
+    Executes the p4 command directly. Arbitrary commands may be executed.
+    If workspace creation is required, be sure to obtain user permission beforehand.
+    Do not create a workspace without permission.
+    Operations with significant impact, such as deleting files or workspaces, require user permission.
+    Do not execute operations requiring administrator privileges, such as obliterate.
+    Args:
+       arguments_json: Provide a JSON-encoded array of parameters. For example, ["files", "//depot/proj/..."]
+    """
+    p4, err= _get_p4()
+    if err:
+        return err
+
+    import json
+    import subprocess
+    args= json.loads( arguments_json )
+    command= [ 'p4', '-p', p4.port, '-u', p4.user, '-P', p4.password ]
+    command.extend( args )
+    print( '==P4 EXEC==', command )
+    try:
+        proc= subprocess.Popen( command, stdout=subprocess.PIPE, stderr=subprocess.PIPE )
+        data= proc.communicate()[0]
+        code= proc.returncode
+    except OSError as err:
+        return  'p4 command error:'+ str(err)
+    if code != 0:
+        return  'p4 command exit code %d' % code
+    if len(arguments_json) < 200:
+        return  _envelope( 'p4_exec (%s)' % arguments_json, data.decode( 'utf-8', errors='ignore' ) )
+    return  _envelope( 'p4_exec', data.decode( 'utf-8', errors='ignore' ) )
+
