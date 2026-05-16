@@ -3,7 +3,6 @@
 
 import sys
 import os
-import threading
 import time
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -12,9 +11,7 @@ from slack_bolt.middleware.assistant import Assistant as SlackAssistant
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
-import Assistant
-import CommonAPI
-from SlackAPI import save_json, load_json
+import ChatEngine
 
 # env:
 #  SLACK_BOT_TOKEN or SLACK_API_TOKEN
@@ -81,142 +78,6 @@ from SlackAPI import save_json, load_json
 
 #------------------------------------------------------------------------------
 
-class ThreadCache:
-    THREAD_CACHE_DIR= 'threads'
-    THREAD_QUEUE_SIZE= 20
-
-    def __init__( self ):
-        self.lock= threading.Lock()
-        self.session_map= {}
-        self.thread_queue= []
-        if not os.path.exists( self.THREAD_CACHE_DIR ):
-            os.mkdir( self.THREAD_CACHE_DIR )
-
-    def pop_queue_0( self, thread_id ):
-        if thread_id in self.thread_queue:
-            self.thread_queue.remove( thread_id )
-        self.thread_queue.append( thread_id )
-        while len(self.thread_queue) > self.THREAD_QUEUE_SIZE:
-            pop_name= self.thread_queue.pop(0)
-            if pop_name in self.session_map:
-                self.session_map[pop_name]= None
-                del self.session_map[pop_name]
-                print( 'Cache <<< %d >>> Removed %s' % (len(self.thread_queue),pop_name) )
-
-    def get_thread_file_name( self, thread_id ):
-        params= thread_id.split( '_' )
-        return  os.path.join( self.THREAD_CACHE_DIR, params[0]+'_'+params[1], thread_id + '.json' )
-
-    def save_thread_0( self, session ):
-        thread_id= session.get_id()
-        save_file_name= self.get_thread_file_name( thread_id )
-        p,_= os.path.split( save_file_name )
-        if not os.path.exists( p ):
-            os.makedirs( p )
-        session.save_session( save_file_name )
-
-    def has_thread_0( self, thread_id ):
-        if thread_id in self.session_map:
-            if self.session_map[thread_id]:
-                return  True
-        thread_file= self.get_thread_file_name( thread_id )
-        if os.path.exists( thread_file ):
-            session= CommonAPI.Session( thread_id )
-            session.load_session( thread_file )
-            session.lock= threading.Lock()
-            self.session_map[thread_id]= session
-            return  True
-        return  False
-
-    def has_thread( self, thread_id ):
-        with self.lock:
-            return  self.has_thread_0( thread_id )
-
-    def has_message( self, thread_id, msg_id ):
-        with self.lock:
-            if self.has_thread_0( thread_id ):
-                session= self.session_map[thread_id]
-                if session.get_info().get('msg_id','') == msg_id:
-                    return  True
-            return  False
-
-    def get_session( self, thread_id ):
-        with self.lock:
-            if not self.has_thread_0( thread_id ):
-                session= CommonAPI.Session( thread_id )
-                session.get_info()['date']= CommonAPI.ExecTime().get_date()
-                session.lock= threading.Lock()
-                self.session_map[thread_id]= session
-            self.pop_queue_0( thread_id )
-            return  self.session_map[thread_id]
-
-
-#------------------------------------------------------------------------------
-
-class TaskManager:
-    def __init__( self ):
-        pass
-
-
-#------------------------------------------------------------------------------
-
-class ChatBotOptions(Assistant.AssistantOptions):
-    def __init__( self, **args ):
-        super().__init__()
-        self.preset= 'chatbot'
-        self.response_all= True
-        self.dm_enabled= False
-        self.assistant_mode= False
-        self.channel_allow_list= []         # channel-id or user-id
-        self.channel_post_allow_list= []
-        self.apply_params( args )
-
-
-#------------------------------------------------------------------------------
-
-class ChatBot:
-    def __init__( self, options ):
-        self.options= options
-        self.thread_cache= ThreadCache()
-        self.assistant= Assistant.Assistant( options )
-
-    #--------------------------------------------------------------------------
-    # Assistant API
-
-        # session_id = セッション(スレッド)を識別できる固有文字列 (必須)
-        # prompt = ユーザー入力 (必須)
-        # msg_id = 同一メッセージかどうか判定する場合のみ必要。不要なら ''
-        # msg_info = スレッド(セッション)ログに記録したい情報。不要なら {}
-    def bot( self, session_id, prompt, msg_id, msg_info ):
-        with CommonAPI.ExecTime( 'Generate' ):
-            session= self.thread_cache.get_session( session_id )
-            with session.get_lock():
-                session.get_info()['mtime']= CommonAPI.ExecTime().get_date()
-                session.get_info()['msg_id']= msg_id
-                session.get_info().update( msg_info )
-                try:
-                    if True:
-                        input_obj= {
-                            'prompt': prompt
-                        }
-                        response,status_code,session= self.assistant.generate_text2( input_obj, session )
-                        if status_code != 200:
-                            response= '\nserver error: %d\n' % status_code
-                    else:
-                        response= '返答だよ'
-                finally:
-                    self.thread_cache.save_thread_0( session )
-        return  response
-
-    def has_message( self, session_id, msg_id ):
-        return  self.thread_cache.has_message( session_id, msg_id )
-
-    def has_session( self, session_id ):
-        return  self.thread_cache.has_thread( session_id )
-
-
-#------------------------------------------------------------------------------
-
 slack_app= None
 
 #------------------------------------------------------------------------------
@@ -272,9 +133,13 @@ def respond_in_assistant_thread( payload, say, client, set_status ):
 class SlackBotApp:
     def __init__( self, options ):
         self.options= options
-        self.chatbot= ChatBot( options )
+        self.chatbot= ChatEngine.ChatEngine( options )
         global slack_app
         slack_app= self
+
+    def close( self ):
+        self.chatbot.close()
+        self.chatbot= None
 
     #--------------------------------------------------------------------------
     # Application
@@ -456,7 +321,7 @@ def usage():
 
 def main( argv ):
     acount= len(argv)
-    options= ChatBotOptions()
+    options= ChatEngine.ChatEngineOptions()
     ai= 1
     while ai < acount:
         arg= argv[ai]
@@ -491,7 +356,10 @@ def main( argv ):
             usage()
 
     botapp= SlackBotApp( options )
-    botapp.run_app()
+    try:
+        botapp.run_app()
+    finally:
+        botapp.close()
     return  0
 
 if __name__ == '__main__':

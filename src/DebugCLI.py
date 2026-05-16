@@ -13,14 +13,18 @@ if platform.system() != 'Windows':
 lib_path= os.path.dirname(__file__)
 if lib_path not in sys.path:
     sys.path.append( lib_path )
-import SlackBot
+import ChatEngine
 
 #------------------------------------------------------------------------------
 
 class ChatCLI:
     def __init__( self, options ):
         self.options= options
-        self.bot= SlackBot.ChatBot( options )
+        self.bot= ChatEngine.ChatEngine( options )
+
+    def close( self ):
+        self.bot.close()
+        self.bot= None
 
     #--------------------------------------------------------------------------
     # Debug CLI
@@ -74,7 +78,7 @@ def usage():
 
 def main( argv ):
     acount= len(argv)
-    options= SlackBot.ChatBotOptions( prompt_text= None, load_session= None )
+    options= ChatEngine.ChatEngineOptions( prompt_text= None, load_session= None )
     ai= 1
     while ai < acount:
         arg= argv[ai]
@@ -109,10 +113,13 @@ def main( argv ):
             usage()
 
     slack_bot= ChatCLI( options )
-    if options.prompt_text:
-        slack_bot.cli_command( options.prompt_text )
-    else:
-        slack_bot.cli_thread()
+    try:
+        if options.prompt_text:
+            slack_bot.cli_command( options.prompt_text )
+        else:
+            slack_bot.cli_thread()
+    finally:
+        slack_bot.close()
     return  0
 
 if __name__ == '__main__':
